@@ -40,8 +40,8 @@ class Pattern:
         :return:
         """
         for layer in self.layers:
-            layer.__scale(ratio)
-            self.__update_bounds()
+            layer.scale(ratio)
+        self.__update_bounds()
 
     def move(self, offset: np.ndarray):
         """

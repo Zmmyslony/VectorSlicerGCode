@@ -9,6 +9,8 @@ class Layer:
         self.path_count = len(print_paths)
         self.bounds = self.__get_bounds()
         self.centre = self.__get_centre()
+        self.printing_distance = self.__get_printing_distance()
+        self.non_printing_distance = self.__get_non_printing_distance()
 
     def __get_bounds(self):
         path_bounds = np.empty([self.path_count, 4], dtype=np.float32)
@@ -25,19 +27,37 @@ class Layer:
     def __get_centre(self):
         return np.array([self.bounds[0] + self.bounds[2], self.bounds[1] + self.bounds[3]]) / 2
 
-    def __update_bounds(self):
+    def __update_properties(self):
         self.bounds = self.__get_bounds()
         self.centre = self.__get_centre()
+        self.printing_distance = self.__get_printing_distance()
+        self.non_printing_distance = self.__get_non_printing_distance()
 
     def __scale(self, ratio: float):
         for path in self.print_paths:
-            path.__scale(ratio)
-        self.__update_bounds()
+            path.scale(ratio)
+        self.__update_properties()
+
+    def __get_printing_distance(self):
+        printing_distance = 0
+        for path in self.print_paths:
+            printing_distance += path.length
+        return printing_distance
+
+    def __get_non_printing_distance(self):
+        if self.path_count == 1:
+            return 0
+        starts = np.array(list(map(lambda path: path.start(), self.print_paths)))
+        ends = np.array(list(map(lambda path: path.end(), self.print_paths)))
+
+        segments = ends[:-2] - starts[1:]
+        segments_length = np.linalg.norm(segments, axis=1)
+        return np.sum(segments_length)
 
     def move(self, offset):
         for path in self.print_paths:
             path.move(offset)
-        self.__update_bounds()
+        self.__update_properties()
 
     def invert(self):
         """
@@ -54,4 +74,4 @@ class Layer:
 
         for path in self.print_paths:
             path.rotate(angle, centre)
-        self.__update_bounds()
+        self.__update_properties()

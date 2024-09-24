@@ -7,18 +7,25 @@ class PrintPath:
         self.path_coordinates = current_line.reshape([int(current_line.shape[0] / 2), 2])
         self.position_count = self.path_coordinates.shape[0]
         self.bounds = self.__get_bounds()
+        self.length = self.__get_length()
 
     def __get_bounds(self):
         min = np.min(self.path_coordinates, axis=0)
         max = np.max(self.path_coordinates, axis=0)
         return np.array([min[0], min[1], max[0], max[1]])
 
-    def __scale(self, ratio):
+    def __get_length(self):
+        segments = np.diff(self.path_coordinates, axis=0)
+        segments_length = np.linalg.norm(segments, axis=1)
+        return np.sum(segments_length)
+
+    def scale(self, ratio):
         if ratio <= 0:
             raise ValueError("Scale must be positive.")
 
         self.path_coordinates *= ratio
         self.bounds *= ratio
+        self.length *= ratio
 
     def move(self, offset):
         offset = np.array(offset)
@@ -44,3 +51,9 @@ class PrintPath:
         self.path_coordinates = np.array([np.cos(angle) * x - np.sin(angle) * y, np.sin(angle) * x + np.cos(angle) * y]).transpose()
         self.path_coordinates += centre
         self.bounds = self.__get_bounds()
+
+    def start(self):
+        return self.path_coordinates[0]
+
+    def end(self):
+        return self.path_coordinates[-1]
