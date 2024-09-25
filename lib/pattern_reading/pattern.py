@@ -7,15 +7,15 @@ class Pattern:
     def __init__(self, pattern_path: Path):
         self.pattern_path = pattern_path
         raw_content = read_pattern(pattern_path)
-        self.print_diameter = int(find_key_data(raw_content, "Print diameter"))
+        self.pixel_path_width = int(find_key_data(raw_content, "Print diameter"))
         self.pattern_name = find_key_data(raw_content, "Source directory")
         self.layers = read_layers(raw_content)
-        self.layers_count = len(self.layers)
+        self.layer_count = len(self.layers)
         self.bounds = self.__get_bounds()
         self.centre = self.__get_centre()
 
     def __get_bounds(self):
-        layer_bounds = np.empty([self.layers_count, 4], dtype=np.float32)
+        layer_bounds = np.empty([self.layer_count, 4], dtype=np.float32)
         for i, layer in enumerate(self.layers):
             layer_bounds[i] = layer.bounds
 
@@ -33,9 +33,10 @@ class Pattern:
         self.bounds = self.__get_bounds()
         self.centre = self.__get_centre()
 
-    def __scale(self, ratio):
+    def scale(self, ratio):
         """
-        Scales the pattern in-place by a given ratio. Should be avoided, as slicing determines the spacing between the paths.
+        Scales the pattern in-place by a given ratio. Use only to go from pixel-based representation to physical
+        length representation, or otherwise the slicing quality will be affected.
         :param ratio:
         :return:
         """

@@ -33,7 +33,7 @@ class Layer:
         self.printing_distance = self.__get_printing_distance()
         self.non_printing_distance = self.__get_non_printing_distance()
 
-    def __scale(self, ratio: float):
+    def scale(self, ratio: float):
         for path in self.print_paths:
             path.scale(ratio)
         self.__update_properties()
@@ -75,3 +75,4 @@ class Layer:
         for path in self.print_paths:
             path.rotate(angle, centre)
         self.__update_properties()
+
