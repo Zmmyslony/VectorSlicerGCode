@@ -5,11 +5,15 @@ from lib.pattern_reading.print_path import PrintPath
 from lib.pattern_reading.pattern import Pattern
 import time
 from pathlib import Path
+import os
 
 VER_MAJOR = 0
 VER_MINOR = 1
 VER_PATCH = 0
 
+_HEADER_FILENAME = "./tmp_header.gcode"
+_BODY_FILENAME = "./tmp_body.gcode"
+_FOOTER_FILENAME = "./tmp_footer.gcode"
 
 class BasePrinter:
     current_position = np.array([0, 0, 0], dtype=np.float32)
@@ -18,9 +22,9 @@ class BasePrinter:
     non_print_distance = 0
     extrusion_distance = 0
 
-    header = ''
-    body = ''
-    footer = ''
+    header = open(_HEADER_FILENAME, "w")
+    body = open(_BODY_FILENAME, "w")
+    footer = open(_FOOTER_FILENAME, "w")
 
     def __init__(self,
                  print_speed,
@@ -59,16 +63,24 @@ class BasePrinter:
         self._comment_header(
             f"Total non-printing distance: {self.non_print_distance:.1f} mm at {self._non_print_speed} mm/min.")
 
+        self.header.close()
+        self.body.close()
+        self.footer.close()
+
         f = open(Path("./output") / filename, 'w')
-        f.write(self.header)
+        f.write(open(_HEADER_FILENAME, "r").read())
         if header_supplement is not None: f.write(header_supplement)
-        f.write("\n")
-        f.write(self.body)
+
+        f.write(open(_BODY_FILENAME, "r").read())
         if body_supplement is not None: f.write(body_supplement)
-        f.write("\n")
-        f.write(self.footer)
+
+        f.write(open(_FOOTER_FILENAME, "r").read())
         if footer_supplement is not None: f.write(footer_supplement)
         f.close()
+
+        os.remove(_FOOTER_FILENAME)
+        os.remove(_HEADER_FILENAME)
+        os.remove(_BODY_FILENAME)
 
     def slice_pattern(self, pattern: Pattern, layers, **kwargs):
         self._physical_pixel_size = self._print_width / pattern.pixel_path_width
@@ -105,28 +117,28 @@ class BasePrinter:
         self._comment_header(f"Generated on: {time_string}.")
 
     def _break_header(self):
-        self.header += "\n"
+        self.header.write("\n")
 
     def _break_body(self):
-        self.body += "\n"
+        self.body.write("\n")
 
     def _comment_body(self, content):
-        self.body += "; " + content + "\n"
+        self.body.write(f"; {content}\n")
 
     def _comment_header(self, content):
-        self.header += "; " + content + "\n"
+        self.header.write(f"; {content}\n")
 
     def _comment_footer(self, content):
-        self.footer += "; " + content + "\n"
+        self.footer.write(f"; {content}\n")
 
     def _command_body(self, content):
-        self.body += content + "\n"
+        self.body.write(f"{content}\n")
 
     def _command_header(self, content):
-        self.header += content + "\n"
+        self.header.write(f"{content}\n")
 
     def _command_footer(self, content):
-        self.footer += content + "\n"
+        self.footer.write(f"{content}\n")
 
     def slice_layer(self, layer: Layer, speed=None):
         if self._physical_pixel_size is None:
