@@ -17,9 +17,10 @@ class Hyrel(BasePrinter):
                  uv_duty_cycle, bed_temperature=0,
                  cleaning_lines=17, cleaning_length=20, first_layer_height=None,
                  pulses_per_ul=KR2_15_PULSES_PER_UL, extrusion_multiplier=1.0,
-                 priming_rate=10000, unpriming_rate=None, height_offset_register=2):
+                 priming_rate=10000, unpriming_rate=None, height_offset_register=2,
+                 is_extrusion_distance_based=False):
         super().__init__(print_speed, non_print_speed, print_width, layer_thickness,
-                         first_layer_height=first_layer_height)
+                         first_layer_height=first_layer_height, is_extrusion_distance_based=is_extrusion_distance_based)
 
         self.tool_number = tool_number
         self.priming_pulses = priming_pulses
@@ -45,9 +46,9 @@ class Hyrel(BasePrinter):
 
     def __configure_flow(self, path_width: float = None, layer_thickness: float = None, flow_multiplier: float = None,
                          pulses_per_ul: int = None, tool: int = None):
-        if path_width is None: path_width = self.print_width
+        if path_width is None: path_width = self._print_width
         if tool is None: tool = self.tool_number
-        if layer_thickness is None: layer_thickness = self.layer_thickness
+        if layer_thickness is None: layer_thickness = self._layer_thickness
         if flow_multiplier is None: flow_multiplier = self.extrusion_multiplier
         if pulses_per_ul is None: pulses_per_ul = self.pulses_per_ul
 
@@ -151,9 +152,9 @@ class Hyrel(BasePrinter):
         self._comment_header("File generated for use with a Hyrel printer.")
 
         self._comment_header(f"Default printing tool: T{self.tool_number} (T1{self.tool_number + 1}).")
-        self._comment_header(f"Path width: {self.print_width} mm.")
-        self._comment_header(f"First layer height: {self.first_layer_thickness} mm.")
-        self._comment_header(f"Layer thickness: {self.layer_thickness} mm.")
+        self._comment_header(f"Path width: {self._print_width} mm.")
+        self._comment_header(f"First layer height: {self._first_layer_thickness} mm.")
+        self._comment_header(f"Layer thickness: {self._layer_thickness} mm.")
 
         self._comment_header("Ensure that your printer is compatible with the resulting gcode.")
         self._break_header()
@@ -189,7 +190,7 @@ class Hyrel(BasePrinter):
         priming_lines: int = math.ceil(prime_pulses / 65535)
         priming_pulses_per_line: float = prime_pulses / priming_lines
         single_line_time: float = priming_pulses_per_line / prime_rate  # in seconds
-        priming_speed: float = min(self.print_speed, 60 * length / single_line_time)
+        priming_speed: float = min(self._print_speed, 60 * length / single_line_time)
 
         self._break_body()
         self._comment_body("Starting initial priming.")
@@ -221,7 +222,7 @@ class Hyrel(BasePrinter):
         priming_lines: int = math.ceil(prime_pulses / 65535)
         priming_pulses_per_line: float = prime_pulses / priming_lines
         single_line_time: float = priming_pulses_per_line / prime_rate  # in seconds
-        priming_speed: float = min(self.print_speed, 60 * length / single_line_time)
+        priming_speed: float = min(self._print_speed, 60 * length / single_line_time)
 
         self._comment_body("Starting unpriming.")
         self._home_2d()
@@ -235,14 +236,14 @@ class Hyrel(BasePrinter):
         self._break_body()
         self._comment_body("Invoking offsets.")
         self._non_printing_move([0, 0])
-        self.__define_height_offset(self.first_layer_thickness, self.height_offset_register)
+        self.__define_height_offset(self._first_layer_thickness, self.height_offset_register)
 
     def _clean_with_priming(self):
         is_going_in_positive_x, priming_lines = (
-            self.__prime_now(self.cleaning_length, self.priming_pulses, self.priming_rate, self.print_width * 2))
+            self.__prime_now(self.cleaning_length, self.priming_pulses, self.priming_rate, self._print_width * 2))
 
         self.generate_zig_zag_pattern(None, self.cleaning_lines - priming_lines, self.cleaning_length,
-                                      self.print_width * 2, is_going_in_positive_x)
+                                      self._print_width * 2, is_going_in_positive_x)
         self._comment_body("Cleaning with priming complete.")
 
     def initial_configuration(self, tool_offset):
