@@ -4,6 +4,7 @@ from lib.pattern_reading.layer import Layer
 from lib.pattern_reading.print_path import PrintPath
 from lib.pattern_reading.pattern import Pattern
 import time
+from pathlib import Path
 
 VER_MAJOR = 0
 VER_MINOR = 1
@@ -50,7 +51,7 @@ class BasePrinter:
         self._comment_header(f"Total printing distance: {self.print_distance:.1f} mm at {self.print_speed} mm/min.")
         self._comment_header(f"Total non-printing distance: {self.non_print_distance:.1f} mm at {self.non_print_speed} mm/min.")
 
-        f = open(filename, 'w')
+        f = open(Path("./output") / filename, 'w')
         f.write(self.header)
         if header_supplement is not None: f.write(header_supplement)
         f.write("\n")
