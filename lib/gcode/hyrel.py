@@ -293,6 +293,3 @@ class Hyrel(BasePrinter):
         self._home_2d()
         self.__turn_motors_off()
         self.__signal_finished_print()
-
-# TODO
-# Make prime/unprime now
