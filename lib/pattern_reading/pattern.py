@@ -6,10 +6,10 @@ import numpy as np
 class Pattern:
     def __init__(self, pattern_path: Path):
         self.pattern_path = pattern_path
-        raw_content = read_pattern(pattern_path)
+        raw_content, overlap_content = read_pattern(pattern_path)
         self.pixel_path_width = int(find_key_data(raw_content, "Print diameter"))
         self.pattern_name = find_key_data(raw_content, "Source directory")
-        self.layers = read_layers(raw_content)
+        self.layers = read_layers(raw_content, overlap_content)
         self.layer_count = len(self.layers)
         self.bounds = self.__get_bounds()
         self.centre = self.__get_centre()

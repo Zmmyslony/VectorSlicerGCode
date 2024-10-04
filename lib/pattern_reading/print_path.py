@@ -2,10 +2,12 @@ import numpy as np
 
 
 class PrintPath:
-    def __init__(self, string):
+    def __init__(self, string, overlap=None):
         current_line = np.fromstring(string, sep=',', dtype=np.float32)
         self.path_coordinates = current_line.reshape([int(current_line.shape[0] / 2), 2])
         self.position_count = self.path_coordinates.shape[0]
+        self.overlap = np.fromstring(overlap, sep=',', dtype=np.float32) if overlap is not None else np.zeros(
+            self.position_count)
         self.bounds = self.__get_bounds()
         self.length = self.__get_length()
 
@@ -37,7 +39,7 @@ class PrintPath:
     def invert(self):
         self.path_coordinates = np.flip(self.path_coordinates, axis=0)
 
-    def rotate(self, angle:float, centre=None):
+    def rotate(self, angle: float, centre=None):
         if centre is None:
             centre = np.array([0, 0], dtype=np.float32)
         else:
@@ -48,7 +50,8 @@ class PrintPath:
         self.path_coordinates -= centre
         x = self.path_coordinates[:, 0]
         y = self.path_coordinates[:, 1]
-        self.path_coordinates = np.array([np.cos(angle) * x - np.sin(angle) * y, np.sin(angle) * x + np.cos(angle) * y]).transpose()
+        self.path_coordinates = np.array(
+            [np.cos(angle) * x - np.sin(angle) * y, np.sin(angle) * x + np.cos(angle) * y]).transpose()
         self.path_coordinates += centre
         self.bounds = self.__get_bounds()
 
