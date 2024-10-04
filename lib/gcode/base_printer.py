@@ -15,6 +15,7 @@ _HEADER_FILENAME = "./tmp_header.gcode"
 _BODY_FILENAME = "./tmp_body.gcode"
 _FOOTER_FILENAME = "./tmp_footer.gcode"
 
+
 class BasePrinter:
     current_position = np.array([0, 0, 0], dtype=np.float32)
     print_time = 0
