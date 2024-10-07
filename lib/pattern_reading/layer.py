@@ -50,7 +50,7 @@ class Layer:
         starts = np.array(list(map(lambda path: path.start(), self.print_paths)))
         ends = np.array(list(map(lambda path: path.end(), self.print_paths)))
 
-        segments = ends[:-2] - starts[1:]
+        segments = ends[:-1] - starts[1:]
         segments_length = np.linalg.norm(segments, axis=1)
         return np.sum(segments_length)
 
