@@ -2,7 +2,7 @@ import math
 
 import numpy as np
 
-from lib.gcode.base_printer import BasePrinter
+from lib.gcode.base_printer import BasePrinter, ExtrusionTypes
 
 KR2_15_PULSES_PER_UL = 1297
 
@@ -11,16 +11,17 @@ def tool_number_m_command(tool_number):
     return tool_number + 11
 
 
-class Hyrel(BasePrinter):
+class HyrelPrinter(BasePrinter):
     def __init__(self, print_speed, non_print_speed, print_width, layer_thickness,
                  tool_number, priming_pulses, nozzle_temperature,
                  uv_duty_cycle, bed_temperature=0,
                  cleaning_lines=17, cleaning_length=20, first_layer_height=None,
                  pulses_per_ul=KR2_15_PULSES_PER_UL, extrusion_multiplier=1.0,
                  priming_rate=10000, unpriming_rate=None, height_offset_register=2,
-                 is_extrusion_distance_based=False):
+                 ):
         super().__init__(print_speed, non_print_speed, print_width, layer_thickness,
-                         first_layer_height=first_layer_height, is_extrusion_distance_based=is_extrusion_distance_based)
+                         first_layer_height=first_layer_height,
+                         extrusion_control_type=ExtrusionTypes["OnOff"])
 
         self.tool_number = tool_number
         self.priming_pulses = priming_pulses
@@ -168,10 +169,10 @@ class Hyrel(BasePrinter):
 
         for i in range(n_lines):
             if is_going_in_positive_x:
-                self._printing_move_2d_relative([l_lines, 0])
+                self._printing_move_relative([l_lines, 0])
             else:
-                self._printing_move_2d_relative([-l_lines, 0])
-            self._printing_move_2d_relative([0, line_spacing])
+                self._printing_move_relative([-l_lines, 0])
+            self._printing_move_relative([0, line_spacing])
             is_going_in_positive_x = not is_going_in_positive_x
 
     def __prime_now(self, length: float, prime_pulses: int, prime_rate: int, line_spacing: float,
@@ -203,9 +204,9 @@ class Hyrel(BasePrinter):
 
         for i in range(priming_lines):
             if is_going_in_positive_x:
-                self._printing_move_2d_relative([length, 0], speed=priming_speed)
+                self._printing_move_relative([length, 0], speed=priming_speed)
             else:
-                self._printing_move_2d_relative([-length, 0], speed=priming_speed)
+                self._printing_move_relative([-length, 0], speed=priming_speed)
             self._non_printing_move_relative([0, line_spacing])
             is_going_in_positive_x = not is_going_in_positive_x
 

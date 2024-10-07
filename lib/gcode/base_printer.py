@@ -10,12 +10,54 @@ from pathlib import Path
 import os
 
 VER_MAJOR = 0
-VER_MINOR = 1
+VER_MINOR = 2
 VER_PATCH = 0
 
 _HEADER_FILENAME = "./tmp_header.gcode"
 _BODY_FILENAME = "./tmp_body.gcode"
 _FOOTER_FILENAME = "./tmp_footer.gcode"
+
+_EXT_ONOFF = 0
+"Extrusion is simply switched on or off using E1 or E0"
+_EXT_ABS_CONST = 1
+"Extrusion is controlled based on absolute E, with constant width and constant speed."
+_EXT_REL_CONST = 2
+"Extrusion is controlled based on relative E, with constant width and constant speed."
+_EXT_ABS_VAR = 3
+"Extrusion is controlled based on absolute E, with variable width and constant speed."
+_EXT_REL_VAR = 4
+"Extrusion is controlled based on relative E, with variable width and constant speed."
+_EXT_ABS_VAR_SPEED = 5
+"Extrusion is controlled based on absolute E, with variable width and variable speed, keeping extrusion rate constant."
+_EXT_REL_VAR_SPEED = 6
+"Extrusion is controlled based on relative E, with variable width and variable speed, keeping extrusion rate constant."
+
+_EXT_WITH_VAR_SPEED = [_EXT_ABS_VAR_SPEED, _EXT_REL_VAR_SPEED]
+"Extrusion types where printing speed is used to control the extrusion width. "
+_EXT_WITH_CONST_W = [_EXT_ABS_CONST, _EXT_REL_CONST, _EXT_ONOFF]
+"Extrusion types where print width is constant. "
+_EXT_WITH_VAR_W = [_EXT_ABS_VAR, _EXT_REL_VAR, _EXT_ABS_VAR_SPEED, _EXT_REL_VAR_SPEED]
+"Extrusion types where print width is variable"
+_EXT_WITH_REL_E = [_EXT_REL_CONST, _EXT_REL_VAR, _EXT_REL_VAR_SPEED]
+"Extrusion types where the extrusion is controlled by relative E value."
+_EXT_WITH_ABS_E = [_EXT_ABS_VAR, _EXT_ABS_CONST, _EXT_ABS_VAR_SPEED]
+"Extrusion types where the extrusion is controlled by absolute E value."
+
+ExtrusionTypes = dict(
+    OnOff=_EXT_ONOFF,
+    AbsoluteConstantWidth=_EXT_ABS_CONST,
+    RelativeConstantWidth=_EXT_REL_CONST,
+    AbsoluteVariableWidth=_EXT_ABS_VAR,
+    RelativeVariableWidth=_EXT_REL_VAR,
+    AbsoluteVariableWidthSpeed = _EXT_ABS_VAR_SPEED,
+    RelativeVariableWidthSpeed = _EXT_REL_VAR_SPEED
+)
+
+
+def cross_section(width, height):
+    """ Follows https://manual.slic3r.org/advanced/flow-math """
+    apparent_width = width + height * (1 - np.pi / 4)
+    return (apparent_width - height) * height + np.pi * (height / 2) ** 2
 
 
 class BasePrinter:
@@ -28,14 +70,17 @@ class BasePrinter:
                  physical_pixel_size=None,
                  lift_off_distance=10,
                  lift_off_height=2,
-                 is_extrusion_distance_based=True,
                  extrusion_multiplier=1,
-                 is_extrusion_axis_absolute=True):
+                 filament_diameter=1.75,
+                 extrusion_control_type: int = ExtrusionTypes['RelativeConstantWidth']):
         self._print_speed = print_speed
         self._non_print_speed = non_print_speed
         self._print_width = print_width
         self._layer_thickness = layer_thickness
         self._first_layer_thickness = layer_thickness if first_layer_height is None else first_layer_height
+        self.filament_cross_section = np.pi * filament_diameter ** 2 / 4
+        self._reference_cross_section = cross_section(print_width, layer_thickness)
+
         rand = f"{random.random() * 1e6:.0f}"
         self.header = open(_HEADER_FILENAME + rand, "w")
         self.body = open(_BODY_FILENAME + rand, "w")
@@ -52,9 +97,8 @@ class BasePrinter:
         self._lift_off_height = lift_off_height
         self._generate_header()
         self._start_time = time.time()
-        self._is_extrusion_distance_based = is_extrusion_distance_based
         self._extrusion_multiplier = extrusion_multiplier
-        self._is_extrusion_axis_absolute = is_extrusion_axis_absolute
+        self._extrusion_control_type = extrusion_control_type
 
     def export(self, filename, header_supplement=None, body_supplement=None, footer_supplement=None):
         seconds = int(self.print_time * 60) % 60
@@ -162,33 +206,54 @@ class BasePrinter:
     def _z_move_incremental(self, displacement, speed=None):
         self._z_move(self.current_position[2] + displacement, speed)
 
-    def _printing_move_2d_relative(self, displacement, speed=None):
-        self._printing_move_2d(self.current_position[:2] + np.array(displacement), speed=speed)
+    def _printing_move_3d_variable_width(self, position, width, speed=None):
+        length = np.linalg.norm(position - self.current_position)
+        path_cross_section = cross_section(width, self._layer_thickness)
+        extrusion_amount = length * path_cross_section / self.filament_cross_section * self._extrusion_multiplier
 
-    def _printing_move_2d(self, position, speed=None):
-        new_pos = np.concatenate([position, [self.current_position[2]]])
-        self._printing_move_3d(new_pos, speed=speed)
-
-    def _printing_move_3d(self, position, speed=None):
+        self.extrusion_distance += extrusion_amount
         print_speed = self._print_speed if speed is None else speed
-        if self._is_extrusion_distance_based:
-            distance = np.linalg.norm(position - self.current_position)
-            extrusion_amount = distance * self._extrusion_multiplier
-            self.extrusion_distance += extrusion_amount
-            self._command_body(
-                f"G1 X{position[0]:.3f} Y{position[1]:.3f} Z{position[2]:.3f} E{self.extrusion_distance if self._is_extrusion_axis_absolute else extrusion_amount :.5f}F{print_speed:d}")
-        else:
-            self._command_body(
-                f"G1 X{position[0]:.3f} Y{position[1]:.3f} Z{position[2]:.3f} F{print_speed:d}")
-        self.current_position = position
 
-    def _printing_move(self, position, speed=None):
-        if len(position) == 2:
-            return self._printing_move_2d(position, speed=speed)
-        elif len(position) == 3:
-            return self._printing_move_3d(position, speed=speed)
+        if self._extrusion_control_type in _EXT_WITH_VAR_SPEED:
+            print_speed *= self._reference_cross_section / path_cross_section
+
+        self.print_distance += length
+        self.print_time += length / print_speed
+        command = f"G1 X{position[0]:.3f} Y{position[1]:.3f} Z{position[2]:.3f}"
+        if self._extrusion_control_type in _EXT_WITH_ABS_E:
+            command += f" E{self.extrusion_distance:.5f}"
+        elif self._extrusion_control_type in _EXT_WITH_REL_E:
+            command += f" E{extrusion_amount:.5f}"
         else:
-            raise RuntimeError(f"Invalid position given: {position} should have either 2 or 3 components.")
+            command += " E1"
+
+        command += f" F{print_speed:.0f}"
+        self.current_position = position
+        self._command_body(command)
+
+    def _printing_move_variable_width(self, position, width, speed=None):
+        if len(position) == 2:
+            position = np.concatenate([position, [self.current_position[2]]])
+        elif len(position) != 3:
+            raise ValueError("Position must be 2- or 3-dimensional vector")
+
+        return self._printing_move_3d_variable_width(position, width, speed=speed)
+
+    def _printing_move_constant_width(self, position, speed=None):
+        return self._printing_move_variable_width(position, self._print_width, speed=speed)
+
+    def _printing_move(self, position, speed=None, width=None):
+        if width is not None and self._extrusion_control_type in _EXT_WITH_VAR_W:
+            return self._printing_move_variable_width(position, self._print_width, speed=speed)
+        else:
+            return self._printing_move_constant_width(position, speed=speed)
+
+    def _printing_move_relative(self, displacement, speed=None):
+        if len(displacement) == 2:
+            displacement = np.concatenate([displacement, [0]])
+        elif len(displacement) != 3:
+            raise ValueError("Position must be 2- or 3-dimensional vector")
+        return self._printing_move(displacement + self.current_position, speed=speed)
 
     def _non_printing_move(self, position, speed=None):
         if speed is None: speed = self._non_print_speed
@@ -254,11 +319,13 @@ class BasePrinter:
     def _slice_path(self, path: PrintPath, speed=None):
         if speed is None: speed = self._print_speed
 
-        for position in path.path_coordinates:
-            self._printing_move(position, speed=speed)
+        for i, position in enumerate(path.path_coordinates):
+            if path.overlap is None or self._extrusion_control_type in _EXT_WITH_CONST_W:
+                self._printing_move(position, speed=speed)
+            else:
+                width = self._print_width * path.overlap[i]
+                self._printing_move_variable_width(position, width, speed=speed)
 
-        self.print_time += path.length / speed
-        self.print_distance += path.length
 
     def import_header(self, header_path):
         header_file = open(header_path, 'r')
