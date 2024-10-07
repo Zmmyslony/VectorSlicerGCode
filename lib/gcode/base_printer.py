@@ -326,7 +326,7 @@ class BasePrinter:
             if path.overlap is None or self._extrusion_control_type in _EXT_WITH_CONST_W:
                 self._printing_move(position, speed=speed)
             else:
-                width = self._print_width * path.overlap[i]
+                width = self._print_width * (1 - path.overlap[i] / 2)
                 self._printing_move_variable_width(position, width, speed=speed)
 
     def import_header(self, header_path):
