@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 from copy import deepcopy, copy
 from lib.pattern_reading.layer import Layer
@@ -17,16 +19,6 @@ _FOOTER_FILENAME = "./tmp_footer.gcode"
 
 
 class BasePrinter:
-    current_position = np.array([0, 0, 0], dtype=np.float32)
-    print_time = 0
-    print_distance = 0
-    non_print_distance = 0
-    extrusion_distance = 0
-
-    header = open(_HEADER_FILENAME, "w")
-    body = open(_BODY_FILENAME, "w")
-    footer = open(_FOOTER_FILENAME, "w")
-
     def __init__(self,
                  print_speed,
                  non_print_speed,
@@ -44,6 +36,16 @@ class BasePrinter:
         self._print_width = print_width
         self._layer_thickness = layer_thickness
         self._first_layer_thickness = layer_thickness if first_layer_height is None else first_layer_height
+        rand = f"{random.random() * 1e6:.0f}"
+        self.header = open(_HEADER_FILENAME + rand, "w")
+        self.body = open(_BODY_FILENAME + rand, "w")
+        self.footer = open(_FOOTER_FILENAME + rand, "w")
+
+        self.current_position = np.array([0, 0, 0], dtype=np.float32)
+        self.print_time = 0
+        self.print_distance = 0
+        self.non_print_distance = 0
+        self.extrusion_distance = 0
 
         self._physical_pixel_size = physical_pixel_size
         self._lift_off_distance = lift_off_distance
