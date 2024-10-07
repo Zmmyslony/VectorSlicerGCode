@@ -11,7 +11,7 @@ import os
 
 VER_MAJOR = 0
 VER_MINOR = 2
-VER_PATCH = 0
+VER_PATCH = 1
 
 _HEADER_FILENAME = "./tmp_header.gcode"
 _BODY_FILENAME = "./tmp_body.gcode"
@@ -49,8 +49,8 @@ ExtrusionTypes = dict(
     RelativeConstantWidth=_EXT_REL_CONST,
     AbsoluteVariableWidth=_EXT_ABS_VAR,
     RelativeVariableWidth=_EXT_REL_VAR,
-    AbsoluteVariableWidthSpeed = _EXT_ABS_VAR_SPEED,
-    RelativeVariableWidthSpeed = _EXT_REL_VAR_SPEED
+    AbsoluteVariableWidthSpeed=_EXT_ABS_VAR_SPEED,
+    RelativeVariableWidthSpeed=_EXT_REL_VAR_SPEED
 )
 
 
@@ -110,24 +110,27 @@ class BasePrinter:
         self._comment_header(
             f"Total non-printing distance: {self.non_print_distance:.1f} mm at {self._non_print_speed} mm/min.")
 
+        h_name = self.header.name
+        b_name = self.body.name
+        f_name = self.footer.name
         self.header.close()
         self.body.close()
         self.footer.close()
 
         f = open(Path("./output") / filename, 'w')
-        f.write(open(_HEADER_FILENAME, "r").read())
+        f.write(open(h_name, "r").read())
         if header_supplement is not None: f.write(header_supplement)
 
-        f.write(open(_BODY_FILENAME, "r").read())
+        f.write(open(b_name, "r").read())
         if body_supplement is not None: f.write(body_supplement)
 
-        f.write(open(_FOOTER_FILENAME, "r").read())
+        f.write(open(f_name, "r").read())
         if footer_supplement is not None: f.write(footer_supplement)
         f.close()
 
-        os.remove(_FOOTER_FILENAME)
-        os.remove(_HEADER_FILENAME)
-        os.remove(_BODY_FILENAME)
+        os.remove(h_name)
+        os.remove(b_name)
+        os.remove(f_name)
 
     def slice_pattern(self, pattern: Pattern, layers, **kwargs):
         self._physical_pixel_size = self._print_width / pattern.pixel_path_width
@@ -325,7 +328,6 @@ class BasePrinter:
             else:
                 width = self._print_width * path.overlap[i]
                 self._printing_move_variable_width(position, width, speed=speed)
-
 
     def import_header(self, header_path):
         header_file = open(header_path, 'r')
