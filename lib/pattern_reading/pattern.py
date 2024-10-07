@@ -44,7 +44,7 @@ class Pattern:
             layer.scale(ratio)
         self.__update_bounds()
 
-    def move(self, offset: np.ndarray):
+    def move(self, offset):
         """
         Moves the pattern in-place.
         :param offset: [x, y] array.
