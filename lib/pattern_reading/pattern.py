@@ -46,7 +46,8 @@ class Pattern:
 
     def move(self, offset):
         """
-        Moves the pattern in-place.
+        Moves the pattern in-place. Warning: if it is used outside of a BasePrinter.slice_pattern, it must be
+        specified in pixel-based coordinates.
         :param offset: [x, y] array.
         :return:
         """
