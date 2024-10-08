@@ -11,7 +11,7 @@ import os
 
 VER_MAJOR = 0
 VER_MINOR = 2
-VER_PATCH = 1
+VER_PATCH = 2
 
 _HEADER_FILENAME = "./tmp_header.gcode"
 _BODY_FILENAME = "./tmp_body.gcode"
@@ -72,13 +72,15 @@ class BasePrinter:
                  lift_off_height=2,
                  extrusion_multiplier=1,
                  filament_diameter=1.75,
-                 extrusion_control_type: int = ExtrusionTypes['RelativeConstantWidth']):
+                 extrusion_control_type: int = ExtrusionTypes['RelativeConstantWidth'],
+                 retraction_length=None,
+                 retraction_rate=None):
         self._print_speed = print_speed
         self._non_print_speed = non_print_speed
         self._print_width = print_width
         self._layer_thickness = layer_thickness
         self._first_layer_thickness = layer_thickness if first_layer_height is None else first_layer_height
-        self.filament_cross_section = np.pi * filament_diameter ** 2 / 4
+        self._filament_cross_section = np.pi * filament_diameter ** 2 / 4
         self._reference_cross_section = cross_section(print_width, layer_thickness)
 
         rand = f"{random.random() * 1e6:.0f}"
@@ -91,6 +93,7 @@ class BasePrinter:
         self.print_distance = 0
         self.non_print_distance = 0
         self.extrusion_distance = 0
+        self._total_extrusion_distance = 0
 
         self._physical_pixel_size = physical_pixel_size
         self._lift_off_distance = lift_off_distance
@@ -100,10 +103,24 @@ class BasePrinter:
         self._extrusion_multiplier = extrusion_multiplier
         self._extrusion_control_type = extrusion_control_type
 
+        self._retraction_length = retraction_length
+        self._retraction_rate = retraction_rate
+
+        self._is_extrusion_on_off = self._extrusion_control_type == _EXT_ONOFF
+        self._is_extrusion_absolute = self._extrusion_control_type in _EXT_WITH_ABS_E
+        self._is_width_variable = self._extrusion_control_type in _EXT_WITH_VAR_W
+        self._is_speed_variable = self._extrusion_control_type in _EXT_WITH_VAR_SPEED
+
+    def _reset_extrusion_status(self):
+        self._total_extrusion_distance += self.extrusion_distance
+        self.extrusion_distance = 0
+        self._command_body("G92 E0")
+
     def export(self, filename, header_supplement=None, body_supplement=None, footer_supplement=None):
         seconds = int(self.print_time * 60) % 60
         minutes = int(self.print_time) % 60
         hours = int(self.print_time / 60) % 60
+        self._reset_extrusion_status()
 
         self._comment_header(f"Total printing time: {hours:d}:{minutes:d}:{seconds:d} (excluding heating).")
         self._comment_header(f"Total printing distance: {self.print_distance:.1f} mm at {self._print_speed} mm/min.")
@@ -132,11 +149,21 @@ class BasePrinter:
         os.remove(b_name)
         os.remove(f_name)
 
-    def slice_pattern(self, pattern: Pattern, layers, **kwargs):
+    def slice_pattern(self, pattern: Pattern, layers, offset=None, **kwargs):
+        """
+        Slices the pattern
+        :param pattern:
+        :param layers: Number of layers to generate the output with.
+        :param offset: Position in mm to which the pattern should be moved. Usually, the pattern extends from [0, 0] in positive direction.
+        :param kwargs:
+        :return:
+        """
         self._physical_pixel_size = self._print_width / pattern.pixel_path_width
         self._comment_body(f"Slicing pattern \"{pattern.pattern_name}\"")
         pattern_copy = deepcopy(pattern)
         pattern_copy.scale(self._physical_pixel_size)
+        if offset is not None:
+            pattern_copy.move(offset)
 
         if hasattr(layers, '__iter__'):
             i_layers = [layer % pattern_copy.layer_count for layer in layers]
@@ -160,6 +187,16 @@ class BasePrinter:
         :return:
         """
         return
+
+    def _set_absolute_extrusion(self):
+        self._is_extrusion_absolute = True
+        self._comment_body("Setting absolute E-values")
+        self._command_body("M82")
+
+    def _set_relative_extrusion(self):
+        self._is_extrusion_absolute = False
+        self._comment_body("Setting relative E-values")
+        self._command_body("M83")
 
     def _generate_header(self):
         time_string = time.strftime("%a, %d %b %Y %H:%M:%S")
@@ -196,6 +233,7 @@ class BasePrinter:
                              "initialisation or by slicing using a Pattern class object.")
 
         self._comment_body("Beginning a new layer.")
+
         for path in layer.print_paths:
             self._comment_body("Moving to the next path.")
             self._non_printing_move(path.start())
@@ -212,12 +250,12 @@ class BasePrinter:
     def _printing_move_3d_variable_width(self, position, width, speed=None):
         length = np.linalg.norm(position - self.current_position)
         path_cross_section = cross_section(width, self._layer_thickness)
-        extrusion_amount = length * path_cross_section / self.filament_cross_section * self._extrusion_multiplier
+        extrusion_amount = length * path_cross_section / self._filament_cross_section * self._extrusion_multiplier
 
         self.extrusion_distance += extrusion_amount
         print_speed = self._print_speed if speed is None else speed
 
-        if self._extrusion_control_type in _EXT_WITH_VAR_SPEED:
+        if self._is_speed_variable:
             print_speed *= self._reference_cross_section / path_cross_section
 
         self.print_distance += length
@@ -233,6 +271,15 @@ class BasePrinter:
         command += f" F{print_speed:.0f}"
         self.current_position = position
         self._command_body(command)
+
+    def __printing_move_constant_width_constant_speed(self, position, speed=None):
+        length = np.linalg.norm(position - self.current_position)
+
+    def __printing_move_base(self, position, extrusion_multiplier, speed):
+        length = np.linalg.norm(position - self.current_position)
+        extrusion = length * extrusion_multiplier
+        self._current_position = position
+        self._command_body(f"G1 X{position[0]:.3f} Y{position[1]:.3f} Z{position[2]:.3f} E{extrusion:.5f} F{speed:.0f}")
 
     def _printing_move_variable_width(self, position, width, speed=None):
         if len(position) == 2:
@@ -266,6 +313,8 @@ class BasePrinter:
         elif len(position) != 3:
             raise RuntimeError(f"Invalid position given: {position} should have either 2 or 3 components.")
 
+        if self._retraction_length is not None and self._retraction_rate is not None:
+            self._command_body(f"G1 E{-self._retraction_length:.5F} F{self._retraction_rate:.0f}")
         if (
                 self._lift_off_distance is not None and
                 np.linalg.norm(position - self.current_position) >= self._lift_off_distance and
@@ -282,6 +331,10 @@ class BasePrinter:
         else:
             self._command_body(f"G0 X{position[0]:.3f} Y{position[1]:.3f} Z{position[2]:.3f} F{speed:.0f}")
             move_length = np.linalg.norm(self.current_position - position)
+
+        if self._retraction_length is not None and self._retraction_rate is not None:
+            self._command_body(f"G1 E{self._retraction_length:.5F} F{self._retraction_rate:.0f}")
+
         self.current_position[:len(position)] = position
         self.non_print_distance += move_length
         self.print_time += move_length / speed
