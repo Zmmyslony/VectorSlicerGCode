@@ -4,9 +4,9 @@ import numpy as np
 
 
 class Pattern:
-    def __init__(self, pattern_path: Path):
-        self.pattern_path = pattern_path
-        raw_content, overlap_content = read_pattern(pattern_path)
+    def __init__(self, pattern_name: str):
+        # self.pattern_path = pattern_name
+        raw_content, overlap_content = read_pattern(pattern_name)
         self.pixel_path_width = int(find_key_data(raw_content, "Print diameter"))
         self.pattern_name = find_key_data(raw_content, "Source directory")
         self.layers = read_layers(raw_content, overlap_content)

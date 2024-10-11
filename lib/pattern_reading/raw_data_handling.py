@@ -1,15 +1,49 @@
 from pathlib import Path
 from lib.pattern_reading.print_path import PrintPath
 from lib.pattern_reading.layer import Layer
+import os
 
 
-def read_pattern(path: Path):
-    if not path.exists():
-        raise FileNotFoundError(f"File not found: {path}")
-    overlap_path = path.parent.parent / "overlap" / f"{path.stem}.csv"
-    overlap_content = overlap_path.read_text(encoding="utf_8") if overlap_path.exists else None
-    raw_content = path.read_text(encoding="utf_8")
-    return raw_content, overlap_content
+def search_for_output_directory(depth, silent=True):
+    if not silent: print(f"Searching for output directory at depth {depth}")
+    parents = Path.cwd().parents
+    root = parents[depth if depth < len(parents) else -1]
+    for roots, dirs, files in os.walk(root):
+        for dir in dirs:
+            dir_parent = Path(roots).stem
+
+            if (dir_parent.lower() == "vector_slicer" or dir_parent.lower() == "vectorslicer") and dir.lower() == "output":
+                return os.path.join(roots, dir)
+    if not silent: print(f"Output directory not found at depth {depth}")
+    return None
+
+
+def find_vector_slicer_directory(silent=True):
+    vector_slicer_api = os.environ.get('VECTOR_SLICER_API')
+    vector_slicer_output = os.environ.get('VECTOR_SLICER_OUTPUT')
+
+    if vector_slicer_output is not None:
+        if not silent: print(f"Found output directory at {vector_slicer_output}")
+        return Path(vector_slicer_output)
+    else:
+        for depth in range(4):
+            found_directory = search_for_output_directory(depth)
+            if found_directory is not None:
+                if not silent: print(f"Found output directory at {found_directory}")
+                return found_directory
+    raise RuntimeError("Could not find the output directory. Ensure that VECTOR_SLICER_OUTPUT environment variable is "
+                       "correctly set, or the VectorSlicerGCode and Vector Slicer share a parent (or 2-nd level parent)"
+                       " directory.")
+
+
+def read_pattern(pattern_name=str):
+    vector_slicer_output = find_vector_slicer_directory()
+    paths = vector_slicer_output / "paths" / f"{pattern_name}.csv"
+    if not paths.exists(): raise FileNotFoundError(f"File not found: {paths}")
+    overlap = vector_slicer_output / "overlap" / f"{pattern_name}.csv"
+    overlap_content = overlap.read_text(encoding="utf_8") if overlap.exists() else None
+    paths_content = paths.read_text(encoding="utf_8")
+    return paths_content, overlap_content
 
 
 def find_key_data(string, parameter_key):
