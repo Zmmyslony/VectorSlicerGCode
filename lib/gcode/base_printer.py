@@ -117,6 +117,9 @@ class BasePrinter:
         self._command_body("G92 E0")
 
     def export(self, filename, header_supplement=None, body_supplement=None, footer_supplement=None):
+        output_directory = Path("./output")
+        if not output_directory.exists():
+            os.mkdir(output_directory)
         seconds = int(self.print_time * 60) % 60
         minutes = int(self.print_time) % 60
         hours = int(self.print_time / 60) % 60
@@ -134,7 +137,7 @@ class BasePrinter:
         self.body.close()
         self.footer.close()
 
-        f = open(Path("./output") / filename, 'w')
+        f = open(output_directory / filename, 'w')
         f.write(open(h_name, "r").read())
         if header_supplement is not None: f.write(header_supplement)
 
