@@ -37,7 +37,7 @@ def find_vector_slicer_directory(silent=True):
 
 
 def read_pattern(pattern_name=str):
-    vector_slicer_output = find_vector_slicer_directory()
+    vector_slicer_output = os.path.Path(find_vector_slicer_directory())
     paths = vector_slicer_output / "paths" / f"{pattern_name}.csv"
     if not paths.exists(): raise FileNotFoundError(f"File not found: {paths}")
     overlap = vector_slicer_output / "overlap" / f"{pattern_name}.csv"
