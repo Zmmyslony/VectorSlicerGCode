@@ -161,11 +161,12 @@ class HyrelPrinter(BasePrinter):
         self._break_header()
 
     def generate_zig_zag_pattern(self, start_position, n_lines: int, l_lines: float, line_spacing: float,
-                                 is_going_in_positive_x=True):
+                                 is_going_in_positive_x=True, height=None):
         self._comment_body(
             f"Generating a zig-zag pattern of total length of {n_lines * l_lines:.1f} mm ({n_lines:d} of {l_lines:.1f} mm).")
 
         if start_position is not None: self._non_printing_move(np.array(start_position))
+        self._z_move(self._first_layer_thickness) if height is None else self._z_move(height)
 
         for i in range(n_lines):
             if is_going_in_positive_x:
