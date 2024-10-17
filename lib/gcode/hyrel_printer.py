@@ -198,16 +198,12 @@ class HyrelPrinter(BasePrinter):
         self._comment_body("Starting initial priming.")
         self.__disable_unpriming(tool_number)
         self.__configure_prime(prime_rate, int(priming_pulses_per_line), tool_number=tool_number)
-        if starting_position is None:
-            self._non_printing_move([0, 0, 0])
-        else:
-            self._non_printing_move(starting_position)
+
+        self._non_printing_move([0, 0, self.current_position[2]] if starting_position is None else starting_position)
+
 
         for i in range(priming_lines):
-            if is_going_in_positive_x:
-                self._printing_move_relative([length, 0], speed=priming_speed)
-            else:
-                self._printing_move_relative([-length, 0], speed=priming_speed)
+            self._printing_move_relative([length, 0] if is_going_in_positive_x else [-length, 0], speed=priming_speed)
             self._non_printing_move_relative([0, line_spacing])
             is_going_in_positive_x = not is_going_in_positive_x
 
@@ -241,6 +237,7 @@ class HyrelPrinter(BasePrinter):
         self.__define_height_offset(self._first_layer_thickness, self.height_offset_register)
 
     def _clean_with_priming(self):
+        self._z_move(self._first_layer_thickness)
         is_going_in_positive_x, priming_lines = (
             self.__prime_now(self.cleaning_length, self.priming_pulses, self.priming_rate, self._print_width * 2))
 
