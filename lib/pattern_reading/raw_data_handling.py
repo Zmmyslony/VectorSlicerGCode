@@ -1,3 +1,23 @@
+#  Copyright (c) 2025, Michał Zmyślony, mlz22@cam.ac.uk.
+#
+#  Please cite following publication if you use any part of this code in work you publish or distribute:
+#  [1] Michał Zmyślony M., Klaudia Dradrach, John S. Biggins,
+#     Slicing vector fields into tool paths for additive manufacturing of nematic elastomers,
+#     Additive Manufacturing, Volume 97, 2025, 104604, ISSN 2214-8604, https://doi.org/10.1016/j.addma.2024.104604.
+#
+#  This file is part of VectorSlicerGCode.
+#
+#  VectorSlicerGCode is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
+#  License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any
+#  later version.
+#
+#  VectorSlicerGCode is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+#  implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+#  Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License along with VectorSlicerGCode.
+#  If not, see <https://www.gnu.org/licenses/>.
+
 from pathlib import Path
 from lib.pattern_reading.print_path import PrintPath
 from lib.pattern_reading.layer import Layer
@@ -19,7 +39,6 @@ def search_for_output_directory(depth, silent=True):
 
 
 def find_vector_slicer_directory(silent=True):
-    vector_slicer_api = os.environ.get('VECTOR_SLICER_API')
     vector_slicer_output = os.environ.get('VECTOR_SLICER_OUTPUT')
 
     if vector_slicer_output is not None:
@@ -39,7 +58,7 @@ def find_vector_slicer_directory(silent=True):
 def read_pattern(pattern_name=str):
     vector_slicer_output = Path(find_vector_slicer_directory())
     paths = vector_slicer_output / "paths" / f"{pattern_name}.csv"
-    if not paths.exists(): raise FileNotFoundError(f"File not found: {paths}")
+    if not paths.exists(): raise FileNotFoundError(f"Please ensure that the input file exists: {paths}")
     overlap = vector_slicer_output / "overlap" / f"{pattern_name}.csv"
     overlap_content = overlap.read_text(encoding="utf_8") if overlap.exists() else None
     paths_content = paths.read_text(encoding="utf_8")

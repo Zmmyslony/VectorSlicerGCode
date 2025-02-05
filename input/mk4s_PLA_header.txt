@@ -1,3 +1,5 @@
+; This header has been taken from files generated using PrusaSlicer
+
 M73 P0 R91
 M73 Q0 S98
 M201 X4000 Y4000 Z200 E2500 ; sets maximum accelerations, mm/sec^2

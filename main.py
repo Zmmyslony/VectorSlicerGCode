@@ -1,23 +1,48 @@
+#  Copyright (c) 2025, Michał Zmyślony, mlz22@cam.ac.uk.
+#
+#  Please cite following publication if you use any part of this code in work you publish or distribute:
+#  [1] Michał Zmyślony M., Klaudia Dradrach, John S. Biggins,
+#     Slicing vector fields into tool paths for additive manufacturing of nematic elastomers,
+#     Additive Manufacturing, Volume 97, 2025, 104604, ISSN 2214-8604, https://doi.org/10.1016/j.addma.2024.104604.
+#
+#  This file is part of VectorSlicerGCode.
+#
+#  VectorSlicerGCode is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
+#  License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any
+#  later version.
+#
+#  VectorSlicerGCode is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+#  implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+#  Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License along with VectorSlicerGCode.
+#  If not, see <https://www.gnu.org/licenses/>.
+
 from lib.pattern_reading.pattern import Pattern
-from lib.gcode.base_printer import BasePrinter
 from lib.gcode.prusa_printer import PrusaPrinter
 from lib.gcode.hyrel_printer import HyrelPrinter
 
-if __name__ == '__main__':
-    pattern_path = "azimuthal_10_mm"
 
-    pattern = Pattern(pattern_path)
-    printer = HyrelPrinter(240, 1200, 0.2, 0.120, 1, 80e3, 80, 50)
-    printer.initial_configuration([105, 86, 0])
+## Example of how to use the generator to gcode files compatible with Hyrel 30M printer.
+def example_hyrel_30m(pattern_name):
+    pattern = Pattern(pattern_name)
+    printer = HyrelPrinter(240, 1200, 0.2, 0.120, 1, 80, 50, [105, 86, 0])
     printer.slice_pattern(pattern, 4, first_layer_thickness=0.24)
-    printer.finish_print()
-    printer.export("test_hyrel.gcode")
+    printer.export(pattern_name + "_hyrel.gcode")
 
-    radial_20_mm_path = "prusa_radial_20_mm"
-    radial_20_mm = Pattern(radial_20_mm_path)
 
+## Example of how to use the generator to gcode files compatible with Prusa MK4s printer using PLA.
+def example_prusa_mk4s(pattern_name):
+    pattern = Pattern(pattern_name)
     prusa = PrusaPrinter()
+    # The header and footer are taken from pre-generated files.
     prusa_header = open("./input/mk4s_PLA_header.txt", "r").read()
     prusa_footer = open("./input/mk4s_PLA_footer.txt", "r").read()
-    prusa.slice_pattern(radial_20_mm, 8, offset=[20, 20])
-    prusa.export("text_prusa.gcode", header_supplement=prusa_header, footer_supplement=prusa_footer)
+    prusa.slice_pattern(pattern, 8, offset=[20, 20])
+
+    prusa.export(pattern_name + "_mk4s.gcode", header_supplement=prusa_header, footer_supplement=prusa_footer)
+
+
+if __name__ == '__main__':
+    example_hyrel_30m("azimuthal_10_mm")
+    example_prusa_mk4s("azimuthal_10_mm")

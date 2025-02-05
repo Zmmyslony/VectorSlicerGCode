@@ -1,3 +1,23 @@
+#  Copyright (c) 2025, Michał Zmyślony, mlz22@cam.ac.uk.
+#
+#  Please cite following publication if you use any part of this code in work you publish or distribute:
+#  [1] Michał Zmyślony M., Klaudia Dradrach, John S. Biggins,
+#     Slicing vector fields into tool paths for additive manufacturing of nematic elastomers,
+#     Additive Manufacturing, Volume 97, 2025, 104604, ISSN 2214-8604, https://doi.org/10.1016/j.addma.2024.104604.
+#
+#  This file is part of VectorSlicerGCode.
+#
+#  VectorSlicerGCode is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
+#  License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any
+#  later version.
+#
+#  VectorSlicerGCode is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+#  implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+#  Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License along with VectorSlicerGCode.
+#  If not, see <https://www.gnu.org/licenses/>.
+
 from pathlib import Path
 from lib.pattern_reading.raw_data_handling import read_pattern, find_key_data, read_layers
 import numpy as np
@@ -5,6 +25,9 @@ import numpy as np
 
 class Pattern:
     def __init__(self, pattern_name: str):
+        """
+        :param pattern_name:  Name of the pattern as a string: it will search for the pattern with this name in the slicer's output directory.
+        """
         # self.pattern_path = pattern_name
         raw_content, overlap_content = read_pattern(pattern_name)
         self.pixel_path_width = int(find_key_data(raw_content, "Print diameter"))

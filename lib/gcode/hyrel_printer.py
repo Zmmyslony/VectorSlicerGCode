@@ -1,24 +1,62 @@
+#  Copyright (c) 2025, Michał Zmyślony, mlz22@cam.ac.uk.
+#
+#  Please cite following publication if you use any part of this code in work you publish or distribute:
+#  [1] Michał Zmyślony M., Klaudia Dradrach, John S. Biggins,
+#     Slicing vector fields into tool paths for additive manufacturing of nematic elastomers,
+#     Additive Manufacturing, Volume 97, 2025, 104604, ISSN 2214-8604, https://doi.org/10.1016/j.addma.2024.104604.
+#
+#  This file is part of VectorSlicerGCode.
+#
+#  VectorSlicerGCode is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
+#  License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any
+#  later version.
+#
+#  VectorSlicerGCode is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+#  implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+#  Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License along with VectorSlicerGCode.
+#  If not, see <https://www.gnu.org/licenses/>.
+
 import math
 
 import numpy as np
 
 from lib.gcode.base_printer import BasePrinter, ExtrusionTypes
 
-KR2_15_PULSES_PER_UL = 1297
+_KR2_15_PULSES_PER_UL = 1297
 
 
-def tool_number_m_command(tool_number):
+def _tool_number_m_command(tool_number):
     return tool_number + 11
 
 
 class HyrelPrinter(BasePrinter):
-    def __init__(self, print_speed, non_print_speed, print_width, layer_thickness,
-                 tool_number, priming_pulses, nozzle_temperature,
-                 uv_duty_cycle, bed_temperature=0,
-                 cleaning_lines=17, cleaning_length=20, first_layer_height=None,
-                 pulses_per_ul=KR2_15_PULSES_PER_UL, extrusion_multiplier=1.0,
-                 priming_rate=10000, unpriming_rate=None, height_offset_register=2,
-                 ):
+    def __init__(self, print_speed, non_print_speed, print_width, layer_thickness, tool_number, nozzle_temperature,
+                 uv_duty_cycle, tool_offset, bed_temperature=0, cleaning_lines=17, cleaning_length=20,
+                 first_layer_height=None, pulses_per_ul=_KR2_15_PULSES_PER_UL, priming_pulses=80000,
+                 extrusion_multiplier=1.0, priming_rate=10000, unpriming_rate=None, height_offset_register=2):
+        """
+        Creates a printer
+        :param print_speed: [mm/min]
+        :param non_print_speed: [mm/min]
+        :param print_width: [mm]
+        :param layer_thickness: [mm]
+        :param tool_number: Index of the tool mount in which the head is installed
+        :param nozzle_temperature: [C]
+        :param uv_duty_cycle: 0-100%
+        :param tool_offset: Position of the new [0, 0, 0] position with respect to homed positions.
+        :param bed_temperature: [C]
+        :param cleaning_lines: [Integer] best to keep odd
+        :param cleaning_length: [mm]
+        :param first_layer_height: [mm]
+        :param pulses_per_ul: KR-15 default: 1297
+        :param extrusion_multiplier: Multiplies the extrusion to extrude more or less than V = w * t * l
+        :param priming_rate: [pulse/s]
+        :param priming_pulses: [pulses]
+        :param unpriming_rate: [pulses/s] if None, priming_rate will be used
+        :param height_offset_register: Index at which Repetrel will register the height offset
+        """
         super().__init__(print_speed, non_print_speed, print_width, layer_thickness,
                          first_layer_height=first_layer_height,
                          extrusion_control_type=ExtrusionTypes["OnOff"])
@@ -40,6 +78,8 @@ class HyrelPrinter(BasePrinter):
 
         self.__generate_secondary_header()
 
+        self._initial_configuration(tool_offset)
+
     def __set_units_to_millimetres(self):
         self._break_body()
         self._comment_body("Setting units to millimetres.")
@@ -55,7 +95,7 @@ class HyrelPrinter(BasePrinter):
 
         self._break_body()
         self._comment_body("Configuring flow.")
-        self._command_body(f"M221 T{tool_number_m_command(tool):d} W{path_width:.3f} "
+        self._command_body(f"M221 T{_tool_number_m_command(tool):d} W{path_width:.3f} "
                            f"Z{layer_thickness:.3f} S{flow_multiplier:.3f} P{pulses_per_ul:d}")
 
     def __set_nozzle_temperature(self, temperature: float = None, tool_number: int = None):
@@ -63,7 +103,7 @@ class HyrelPrinter(BasePrinter):
         if tool_number is None: tool_number = self.tool_number
         self._break_body()
         self._comment_body(f"Setting nozzle temperature to {temperature:d}C.")
-        self._command_body(f"M109 T{tool_number_m_command(tool_number)} S{temperature:d}")
+        self._command_body(f"M109 T{_tool_number_m_command(tool_number)} S{temperature:d}")
 
     def __set_bed_temperature(self, temperature: float = None):
         if temperature is None: temperature = self.bed_temperature
@@ -110,7 +150,7 @@ class HyrelPrinter(BasePrinter):
 
         self._break_body()
         self._comment_body("Setting tool offset.")
-        self._command_body(f"M6 T{tool_number_m_command(tool_number)} O{tool_number + 1} X{offset[0]:.3f} "
+        self._command_body(f"M6 T{_tool_number_m_command(tool_number)} O{tool_number + 1} X{offset[0]:.3f} "
                            f"Y{offset[1]:.3f} Z{offset[2]:.3f}")
 
     def __configure_prime(self, pulse_rate: int, number_of_pulses: int, dwell_time: int = 0,
@@ -121,10 +161,10 @@ class HyrelPrinter(BasePrinter):
         self._break_body()
         self._comment_body("Configuring priming.")
         self._command_body(
-            f"M722 T{tool_number_m_command(tool_number)} S{pulse_rate:d} E{number_of_pulses:d} P{dwell_time:d}")
+            f"M722 T{_tool_number_m_command(tool_number)} S{pulse_rate:d} E{number_of_pulses:d} P{dwell_time:d}")
         if is_executed_immediately:
             self._comment_body("Priming now.")
-            self._command_body(f"M722 T{tool_number_m_command(tool_number)} I1")
+            self._command_body(f"M722 T{_tool_number_m_command(tool_number)} I1")
 
     def __configure_unprime(self, pulse_rate: int, number_of_pulses: int, dwell_time: int,
                             is_executed_immediately: bool = False, tool_number: int = None):
@@ -135,10 +175,10 @@ class HyrelPrinter(BasePrinter):
         self._break_body()
         self._comment_body("Configuring unpriming.")
         self._command_body(
-            f"M721 T{tool_number_m_command(tool_number)} S{pulse_rate:d} E{number_of_pulses:d} P{dwell_time:d}")
+            f"M721 T{_tool_number_m_command(tool_number)} S{pulse_rate:d} E{number_of_pulses:d} P{dwell_time:d}")
         if is_executed_immediately:
             self._comment_body("Unpriming now.")
-            self._command_body(f"M721 T{tool_number_m_command(tool_number)} I1")
+            self._command_body(f"M721 T{_tool_number_m_command(tool_number)} I1")
 
     def __disable_priming(self, tool_number: int = None):
         if tool_number is None: tool_number = self.tool_number
@@ -201,7 +241,6 @@ class HyrelPrinter(BasePrinter):
 
         self._non_printing_move([0, 0, self.current_position[2]] if starting_position is None else starting_position)
 
-
         for i in range(priming_lines):
             self._printing_move_relative([length, 0] if is_going_in_positive_x else [-length, 0], speed=priming_speed)
             self._non_printing_move_relative([0, line_spacing])
@@ -245,7 +284,12 @@ class HyrelPrinter(BasePrinter):
                                       self._print_width * 2, is_going_in_positive_x)
         self._comment_body("Cleaning with priming complete.")
 
-    def initial_configuration(self, tool_offset):
+    def _initial_configuration(self, tool_offset):
+        """
+        This function must be right after importing the printer.
+        :param tool_offset: The absolute [x, y, z] position to set as new absolute [0, 0, 0].
+        :return:
+        """
         self.__set_units_to_millimetres()
         self.__clear_offsets()
 
@@ -273,9 +317,9 @@ class HyrelPrinter(BasePrinter):
 
         self._break_body()
         self._comment_body(f"Linking the UV pen to switch on during printing moves of T{head_tool_number:d}")
-        self._command_body(f"M703 T{tool_number_m_command(pen_tool_number)} S{tool_number_m_command(head_tool_number)}")
-        self._command_body(f"M620 T{tool_number_m_command(pen_tool_number)} E1")
-        self._command_body(f"M621 T{tool_number_m_command(pen_tool_number)} P{uv_duty_cycle:d}")
+        self._command_body(f"M703 T{_tool_number_m_command(pen_tool_number)} S{_tool_number_m_command(head_tool_number)}")
+        self._command_body(f"M620 T{_tool_number_m_command(pen_tool_number)} E1")
+        self._command_body(f"M621 T{_tool_number_m_command(pen_tool_number)} P{uv_duty_cycle:d}")
 
     def _configure_uv_array(self, uv_duty_cycle=None, head_tool_number=None):
         if uv_duty_cycle is None: uv_duty_cycle = self.uv_duty_cycle
@@ -284,12 +328,16 @@ class HyrelPrinter(BasePrinter):
 
         self._break_body()
         self._comment_body("Setting UV array duty cycle.")
-        self._command_body(f"M106 T{tool_number_m_command(head_tool_number):d} P{uv_duty_cycle:d}")
+        self._command_body(f"M106 T{_tool_number_m_command(head_tool_number):d} P{uv_duty_cycle:d}")
 
-    def finish_print(self):
+    def _finish_print(self):
         self.__unprime_now()
         self.__set_bed_temperature(0)
         self.__set_nozzle_temperature(0)
         self._home_2d()
         self.__turn_motors_off()
         self.__signal_finished_print()
+
+    def export(self, filename, header_supplement=None, body_supplement=None, footer_supplement=None):
+        self._finish_print()
+        super().export(filename, header_supplement, body_supplement, footer_supplement)
