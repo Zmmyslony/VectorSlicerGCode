@@ -43,6 +43,11 @@ def _tool_number_m_command(tool_number):
 
 
 class HyrelPrinter(BasePrinter):
+    """
+    Warning: this code was tested for System 30M only! If your printer is a different model, be careful when using it
+    and contact the code maintainer for support.
+    Implementation of a printer with Hyrel-specific GCode commands.
+    """
     def __init__(self, print_speed, non_print_speed, print_width, layer_thickness, tool_number, nozzle_temperature,
                  uv_duty_cycle, tool_offset, bed_temperature=0, cleaning_lines=17, cleaning_length=20,
                  first_layer_height=None, pulses_per_ul=_100_gear_ratio_pulses, priming_pulses=80000,
@@ -211,8 +216,18 @@ class HyrelPrinter(BasePrinter):
         self._comment_header("Ensure that your printer is compatible with the resulting gcode.")
         self._break_header()
 
-    def generate_zig_zag_pattern(self, start_position, n_lines: int, l_lines: float, line_spacing: float,
-                                 is_going_in_positive_x=True, height=None):
+    def generate_zig_zag_pattern(self, start_position: np.ndarray, n_lines: int, l_lines: float, line_spacing: float,
+                                 is_going_in_positive_x: bool = True, height: float = None):
+        """
+        Generates a zig-zag pattern that alternates in the x-direction. Used for cleaning and calibration.
+        :param start_position: [x, y] array
+        :param n_lines: number of lines
+        :param l_lines: length of each line
+        :param line_spacing: distance between the centres of lines
+        :param is_going_in_positive_x: is the first line going in the positive x-direction
+        :param height: default: None, uses the current height
+        :return:
+        """
         self._comment_body(
             f"Generating a zig-zag pattern of total length of {n_lines * l_lines:.1f} mm ({n_lines:d} of {l_lines:.1f} mm).")
 

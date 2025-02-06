@@ -23,6 +23,10 @@ import numpy as np
 
 
 class PrusaPrinter(BasePrinter):
+    """
+    Base configuration of Prusa's MK4S printer which uses PLA and variable width, i.e. extruded width ranges between
+    0.4 to 0.8 mm to accommodate for the divergences in the director pattern.
+    """
     def __init__(self, print_speed=2400, non_print_speed=18000, print_width=0.8, layer_thickness=0.2,
                  lift_off_distance=5, lift_off_height=0.8, filament_diameter=1.75):
         BasePrinter.__init__(self, print_speed, non_print_speed, print_width, layer_thickness,

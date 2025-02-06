@@ -56,7 +56,7 @@ class Pattern:
         self.bounds = self.__get_bounds()
         self.centre = self.__get_centre()
 
-    def scale(self, ratio):
+    def scale(self, ratio: float):
         """
         Scales the pattern in-place by a given ratio. Use only to go from pixel-based representation to physical
         length representation, or otherwise the slicing quality will be affected.
@@ -67,10 +67,10 @@ class Pattern:
             layer.scale(ratio)
         self.__update_bounds()
 
-    def move(self, offset):
+    def move(self, offset: np.ndarray):
         """
-        Moves the pattern in-place. Warning: if it is used outside of a BasePrinter.slice_pattern, it must be
-        specified in pixel-based coordinates.
+        Moves the pattern in-place. Warning: it must be specified in pixel-based coordinates, as translation from
+        pixels to physical units happens when the pattern is sliced.
         :param offset: [x, y] array.
         :return:
         """
@@ -78,10 +78,10 @@ class Pattern:
             layers.move(offset)
         self.__update_bounds()
 
-    def rotate(self, angle, centre=None):
+    def rotate(self, angle: float, centre: np.ndarray = None):
         """
         Rotates the pattern in-place, by a given angle with the provided centre of rotation.
-        :param angle:
+        :param angle: [rad]
         :param centre: If None, then the centre of the pattern will be used.
         :return:
         """

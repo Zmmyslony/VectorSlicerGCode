@@ -30,8 +30,8 @@ from pathlib import Path
 import os
 
 VER_MAJOR = 0
-VER_MINOR = 2
-VER_PATCH = 2
+VER_MINOR = 3
+VER_PATCH = 0
 
 _HEADER_FILENAME = "./tmp_header.gcode"
 _BODY_FILENAME = "./tmp_body.gcode"
@@ -74,13 +74,16 @@ ExtrusionTypes = dict(
 )
 
 
-def cross_section(width, height):
+def __cross_section(width, height):
     """ Follows https://manual.slic3r.org/advanced/flow-math """
     apparent_width = width + height * (1 - np.pi / 4)
     return (apparent_width - height) * height + np.pi * (height / 2) ** 2
 
 
 class BasePrinter:
+    """
+    Base printer object that should be configured before using.
+    """
     def __init__(self,
                  print_speed,
                  non_print_speed,
@@ -101,7 +104,7 @@ class BasePrinter:
         self._layer_thickness = layer_thickness
         self._first_layer_thickness = layer_thickness if first_layer_height is None else first_layer_height
         self._filament_cross_section = np.pi * filament_diameter ** 2 / 4
-        self._reference_cross_section = cross_section(print_width, layer_thickness)
+        self._reference_cross_section = __cross_section(print_width, layer_thickness)
 
         rand = f"{random.random() * 1e6:.0f}"
         self.header = open(_HEADER_FILENAME + rand, "w")
@@ -131,12 +134,17 @@ class BasePrinter:
         self._is_width_variable = self._extrusion_control_type in _EXT_WITH_VAR_W
         self._is_speed_variable = self._extrusion_control_type in _EXT_WITH_VAR_SPEED
 
-    def _reset_extrusion_status(self):
-        self._total_extrusion_distance += self.extrusion_distance
-        self.extrusion_distance = 0
-        self._command_body("G92 E0")
-
-    def export(self, filename, header_supplement=None, body_supplement=None, footer_supplement=None):
+    def export(self, filename: str, header_supplement: str = None, body_supplement: str = None,
+               footer_supplement: str = None):
+        """
+        Exports the sliced pattern as ./output/{filename}.csv. If supplements are provided, they are placed after
+        auto-generated header/body/footer.
+        :param filename: stem of the desired filename
+        :param header_supplement:
+        :param body_supplement:
+        :param footer_supplement:
+        :return:
+        """
         output_directory = Path("./output")
         if not output_directory.exists():
             os.mkdir(output_directory)
@@ -172,7 +180,7 @@ class BasePrinter:
         os.remove(b_name)
         os.remove(f_name)
 
-    def slice_pattern(self, pattern: Pattern, layers, offset=None, **kwargs):
+    def slice_pattern(self, pattern: Pattern, layers: int, offset=None, **kwargs):
         """
         Slices the pattern
         :param pattern:
@@ -181,6 +189,7 @@ class BasePrinter:
         :param kwargs:
         :return:
         """
+        if layers > 0: raise RuntimeError("Pattern cannot be sliced with non-positive number of layers.")
         self._physical_pixel_size = self._print_width / pattern.pixel_path_width
         self._comment_body(f"Slicing pattern \"{pattern.pattern_name}\"")
         pattern_copy = deepcopy(pattern)
@@ -211,10 +220,27 @@ class BasePrinter:
         """
         return
 
+    def slice_layer(self, layer: Layer, speed=None):
+        if self._physical_pixel_size is None:
+            raise ValueError("Physical pixel size is undefined. Initialise it either by providing it during "
+                             "initialisation or by slicing using a Pattern class object.")
+
+        self._comment_body("Beginning a new layer.")
+
+        for path in layer.print_paths:
+            self._comment_body("Moving to the next path.")
+            self._non_printing_move(path.start())
+            self._slice_path(path, speed=speed)
+
     def _set_absolute_extrusion(self):
         self._is_extrusion_absolute = True
         self._comment_body("Setting absolute E-values")
         self._command_body("M82")
+
+    def _reset_extrusion_status(self):
+        self._total_extrusion_distance += self.extrusion_distance
+        self.extrusion_distance = 0
+        self._command_body("G92 E0")
 
     def _set_relative_extrusion(self):
         self._is_extrusion_absolute = False
@@ -250,18 +276,6 @@ class BasePrinter:
     def _command_footer(self, content):
         self.footer.write(f"{content}\n")
 
-    def slice_layer(self, layer: Layer, speed=None):
-        if self._physical_pixel_size is None:
-            raise ValueError("Physical pixel size is undefined. Initialise it either by providing it during "
-                             "initialisation or by slicing using a Pattern class object.")
-
-        self._comment_body("Beginning a new layer.")
-
-        for path in layer.print_paths:
-            self._comment_body("Moving to the next path.")
-            self._non_printing_move(path.start())
-            self._slice_path(path, speed=speed)
-
     def _z_move(self, height, speed=None):
         new_position = copy(self.current_position)
         new_position[2] = height
@@ -272,7 +286,7 @@ class BasePrinter:
 
     def _printing_move_3d_variable_width(self, position, width, speed=None):
         length = np.linalg.norm(position - self.current_position)
-        path_cross_section = cross_section(width, self._layer_thickness)
+        path_cross_section = __cross_section(width, self._layer_thickness)
         extrusion_amount = length * path_cross_section / self._filament_cross_section * self._extrusion_multiplier
 
         self.extrusion_distance += extrusion_amount
