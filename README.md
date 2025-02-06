@@ -23,7 +23,7 @@ Please cite following publication if you use any part of this code in work you p
 
 ### Guarantee
 
-Software is published without any guarantee or promise of maintenance. It is
+Software is published without any guarantee or promise of maintenance. It was
 developed for internal use, and is published without extensive documentation.
 
 ## Funding
