@@ -74,7 +74,7 @@ ExtrusionTypes = dict(
 )
 
 
-def __cross_section(width, height):
+def cross_section(width, height):
     """ Follows https://manual.slic3r.org/advanced/flow-math """
     apparent_width = width + height * (1 - np.pi / 4)
     return (apparent_width - height) * height + np.pi * (height / 2) ** 2
@@ -104,12 +104,11 @@ class BasePrinter:
         self._layer_thickness = layer_thickness
         self._first_layer_thickness = layer_thickness if first_layer_height is None else first_layer_height
         self._filament_cross_section = np.pi * filament_diameter ** 2 / 4
-        self._reference_cross_section = __cross_section(print_width, layer_thickness)
+        self._reference_cross_section = cross_section(print_width, layer_thickness)
 
-        rand = f"{random.random() * 1e6:.0f}"
-        self.header = open(_HEADER_FILENAME + rand, "w")
-        self.body = open(_BODY_FILENAME + rand, "w")
-        self.footer = open(_FOOTER_FILENAME + rand, "w")
+        self.header = open(_HEADER_FILENAME + "_tmp", "w")
+        self.body = open(_BODY_FILENAME + "_tmp", "w")
+        self.footer = open(_FOOTER_FILENAME + "_tmp", "w")
 
         self.current_position = np.array([0, 0, 0], dtype=np.float32)
         self.print_time = 0
@@ -189,7 +188,7 @@ class BasePrinter:
         :param kwargs:
         :return:
         """
-        if layers > 0: raise RuntimeError("Pattern cannot be sliced with non-positive number of layers.")
+        if layers <= 0: raise RuntimeError("Pattern cannot be sliced with non-positive number of layers.")
         self._physical_pixel_size = self._print_width / pattern.pixel_path_width
         self._comment_body(f"Slicing pattern \"{pattern.pattern_name}\"")
         pattern_copy = deepcopy(pattern)
@@ -286,7 +285,7 @@ class BasePrinter:
 
     def _printing_move_3d_variable_width(self, position, width, speed=None):
         length = np.linalg.norm(position - self.current_position)
-        path_cross_section = __cross_section(width, self._layer_thickness)
+        path_cross_section = cross_section(width, self._layer_thickness)
         extrusion_amount = length * path_cross_section / self._filament_cross_section * self._extrusion_multiplier
 
         self.extrusion_distance += extrusion_amount
