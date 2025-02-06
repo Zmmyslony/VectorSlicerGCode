@@ -180,7 +180,7 @@ class BasePrinter:
         os.remove(b_name)
         os.remove(f_name)
 
-    def slice_pattern(self, pattern: Pattern, layers: int, offset: np.ndarray = None, **kwargs):
+    def slice_pattern(self, pattern: Pattern, layers: int, offset: list = None, **kwargs):
         """
         Slices the pattern
         :param pattern:
@@ -189,6 +189,7 @@ class BasePrinter:
         :param kwargs:
         :return:
         """
+        self._start_time = time.time()
         if layers <= 0: raise RuntimeError("Pattern cannot be sliced with non-positive number of layers.")
         self._physical_pixel_size = self._print_width / pattern.pixel_path_width
         self._comment_body(f"Slicing pattern \"{pattern.pattern_name}\"")
@@ -202,6 +203,7 @@ class BasePrinter:
         else:
             i_layers = [i % pattern_copy.layer_count for i in range(layers)]
 
+        self._non_printing_move(pattern_copy.get_origin())
         self._z_move(kwargs.get('first_layer_thickness', self._first_layer_thickness))
 
         for i, i_layer in enumerate(i_layers):

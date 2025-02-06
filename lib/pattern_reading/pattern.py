@@ -49,6 +49,11 @@ class Pattern:
             np.max(layer_bounds[:, 3])
         ])
 
+    def get_origin(self):
+        first_layer = self.layers[0]
+        first_path = first_layer.print_paths[0]
+        return first_path.path_coordinates[0]
+
     def __get_centre(self):
         return np.array([self.bounds[0] + self.bounds[2], self.bounds[1] + self.bounds[3]]) / 2
 
