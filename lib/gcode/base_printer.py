@@ -84,6 +84,7 @@ class BasePrinter:
     """
     Base printer object that should be configured before using.
     """
+
     def __init__(self,
                  print_speed,
                  non_print_speed,
@@ -179,7 +180,7 @@ class BasePrinter:
         os.remove(b_name)
         os.remove(f_name)
 
-    def slice_pattern(self, pattern: Pattern, layers: int, offset=None, **kwargs):
+    def slice_pattern(self, pattern: Pattern, layers: int, offset: np.ndarray = None, **kwargs):
         """
         Slices the pattern
         :param pattern:

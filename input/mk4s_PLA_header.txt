@@ -9,7 +9,7 @@ M205 X8.00 Y8.00 Z2.00 E10.00 ; sets the jerk limits, mm/sec
 M205 S0 T0 ; sets the minimum extruding and travel feed rate, mm/sec
 
 M486 S0
-M486 AhexScraper
+M486 Vector Slicer output
 M486 S-1
 
 ;TYPE:Custom
