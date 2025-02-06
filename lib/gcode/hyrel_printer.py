@@ -24,7 +24,18 @@ import numpy as np
 
 from lib.gcode.base_printer import BasePrinter, ExtrusionTypes
 
-_KR2_15_PULSES_PER_UL = 1297
+# Pulses pre microlitre of extruded material taken from
+# https://hyrel3d.com/wiki/index.php/Pulses_per_Microliter on 06.02.2025
+
+# DIW heads:
+# 100:1 gear ratio: EMO-XT, KR2, and TAM Heads
+_100_gear_ratio_pulses = 1297
+# 27:1 gear ratio: EMO and VOL Heads
+_27_gear_ratio_pulses = 271
+
+# FFM heads:
+_mk_250_pulses = 84.7
+_ht_pulses = 192.4
 
 
 def _tool_number_m_command(tool_number):
@@ -34,7 +45,7 @@ def _tool_number_m_command(tool_number):
 class HyrelPrinter(BasePrinter):
     def __init__(self, print_speed, non_print_speed, print_width, layer_thickness, tool_number, nozzle_temperature,
                  uv_duty_cycle, tool_offset, bed_temperature=0, cleaning_lines=17, cleaning_length=20,
-                 first_layer_height=None, pulses_per_ul=_KR2_15_PULSES_PER_UL, priming_pulses=80000,
+                 first_layer_height=None, pulses_per_ul=_100_gear_ratio_pulses, priming_pulses=80000,
                  extrusion_multiplier=1.0, priming_rate=10000, unpriming_rate=None, height_offset_register=2):
         """
         Creates a printer
@@ -317,7 +328,8 @@ class HyrelPrinter(BasePrinter):
 
         self._break_body()
         self._comment_body(f"Linking the UV pen to switch on during printing moves of T{head_tool_number:d}")
-        self._command_body(f"M703 T{_tool_number_m_command(pen_tool_number)} S{_tool_number_m_command(head_tool_number)}")
+        self._command_body(
+            f"M703 T{_tool_number_m_command(pen_tool_number)} S{_tool_number_m_command(head_tool_number)}")
         self._command_body(f"M620 T{_tool_number_m_command(pen_tool_number)} E1")
         self._command_body(f"M621 T{_tool_number_m_command(pen_tool_number)} P{uv_duty_cycle:d}")
 
