@@ -74,7 +74,7 @@ ExtrusionTypes = dict(
 )
 
 
-def __cross_section(width, height):
+def cross_section(width, height):
     """ Follows https://manual.slic3r.org/advanced/flow-math """
     apparent_width = width + height * (1 - np.pi / 4)
     return (apparent_width - height) * height + np.pi * (height / 2) ** 2
@@ -104,12 +104,12 @@ class BasePrinter:
         self._layer_thickness = layer_thickness
         self._first_layer_thickness = layer_thickness if first_layer_height is None else first_layer_height
         self._filament_cross_section = np.pi * filament_diameter ** 2 / 4
-        self._reference_cross_section = __cross_section(print_width, layer_thickness)
+        self._reference_cross_section = cross_section(print_width, layer_thickness)
 
         rand = f"{random.random() * 1e6:.0f}"
-        self.header = open(_HEADER_FILENAME + rand, "w")
-        self.body = open(_BODY_FILENAME + rand, "w")
-        self.footer = open(_FOOTER_FILENAME + rand, "w")
+        self.header = str()
+        self.body = str()
+        self.footer = str()
 
         self.current_position = np.array([0, 0, 0], dtype=np.float32)
         self.print_time = 0
@@ -158,27 +158,16 @@ class BasePrinter:
         self._comment_header(
             f"Total non-printing distance: {self.non_print_distance:.1f} mm at {self._non_print_speed} mm/min.")
 
-        h_name = self.header.name
-        b_name = self.body.name
-        f_name = self.footer.name
-        self.header.close()
-        self.body.close()
-        self.footer.close()
-
         f = open(output_directory / filename, 'w')
-        f.write(open(h_name, "r").read())
+        f.write(self.header)
         if header_supplement is not None: f.write(header_supplement)
 
-        f.write(open(b_name, "r").read())
+        f.write(self.body)
         if body_supplement is not None: f.write(body_supplement)
 
-        f.write(open(f_name, "r").read())
+        f.write(self.footer)
         if footer_supplement is not None: f.write(footer_supplement)
         f.close()
-
-        os.remove(h_name)
-        os.remove(b_name)
-        os.remove(f_name)
 
     def slice_pattern(self, pattern: Pattern, layers: int, offset=None, **kwargs):
         """
@@ -189,7 +178,7 @@ class BasePrinter:
         :param kwargs:
         :return:
         """
-        if layers > 0: raise RuntimeError("Pattern cannot be sliced with non-positive number of layers.")
+        if layers <= 0: raise RuntimeError("Pattern cannot be sliced with non-positive number of layers.")
         self._physical_pixel_size = self._print_width / pattern.pixel_path_width
         self._comment_body(f"Slicing pattern \"{pattern.pattern_name}\"")
         pattern_copy = deepcopy(pattern)
@@ -253,28 +242,28 @@ class BasePrinter:
         self._comment_header(f"Generated on: {time_string}.")
 
     def _break_header(self):
-        self.header.write("\n")
+        self.header.join("\n")
 
     def _break_body(self):
-        self.body.write("\n")
+        self.body.join("\n")
 
     def _comment_body(self, content):
-        self.body.write(f"; {content}\n")
+        self.body.join(f"; {content}\n")
 
     def _comment_header(self, content):
-        self.header.write(f"; {content}\n")
+        self.header.join(f"; {content}\n")
 
     def _comment_footer(self, content):
-        self.footer.write(f"; {content}\n")
+        self.footer.join(f"; {content}\n")
 
     def _command_body(self, content):
-        self.body.write(f"{content}\n")
+        self.body.join(f"{content}\n")
 
     def _command_header(self, content):
-        self.header.write(f"{content}\n")
+        self.header.join(f"{content}\n")
 
     def _command_footer(self, content):
-        self.footer.write(f"{content}\n")
+        self.footer.join(f"{content}\n")
 
     def _z_move(self, height, speed=None):
         new_position = copy(self.current_position)
@@ -286,7 +275,7 @@ class BasePrinter:
 
     def _printing_move_3d_variable_width(self, position, width, speed=None):
         length = np.linalg.norm(position - self.current_position)
-        path_cross_section = __cross_section(width, self._layer_thickness)
+        path_cross_section = cross_section(width, self._layer_thickness)
         extrusion_amount = length * path_cross_section / self._filament_cross_section * self._extrusion_multiplier
 
         self.extrusion_distance += extrusion_amount
