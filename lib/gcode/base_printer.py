@@ -98,7 +98,10 @@ class BasePrinter:
                  filament_diameter=1.75,
                  extrusion_control_type: int = ExtrusionTypes['RelativeConstantWidth'],
                  retraction_length=None,
-                 retraction_rate=None):
+                 retraction_rate=None,
+                 x_limit=None,
+                 y_limit=None,
+                 z_limit=None):
         self._print_speed = print_speed
         self._non_print_speed = non_print_speed
         self._print_width = print_width
@@ -133,6 +136,10 @@ class BasePrinter:
         self._is_extrusion_absolute = self._extrusion_control_type in _EXT_WITH_ABS_E
         self._is_width_variable = self._extrusion_control_type in _EXT_WITH_VAR_W
         self._is_speed_variable = self._extrusion_control_type in _EXT_WITH_VAR_SPEED
+
+        self.x_limit = x_limit
+        self.y_limit = y_limit
+        self.z_limit = z_limit
 
     def export(self, filename: str, header_supplement: str = None, body_supplement: str = None,
                footer_supplement: str = None):
@@ -314,7 +321,15 @@ class BasePrinter:
     def __printing_move_constant_width_constant_speed(self, position, speed=None):
         length = np.linalg.norm(position - self.current_position)
 
+    def __is_position_in_bounds(self, position):
+        if ((self.x_limit is not None and position[0] > self.x_limit) or
+            (self.y_limit is not None and position[1] > self.y_limit) or
+            (self.z_limit is not None and position[2] > self.z_limit)):
+            raise RuntimeError(f"Position {position} is out of bounds [{self.x_limit}, {self.y_limit}, {self.z_limit}] .")
+
     def __printing_move_base(self, position, extrusion_multiplier, speed):
+        self.__is_position_in_bounds(position)
+
         length = np.linalg.norm(position - self.current_position)
         extrusion = length * extrusion_multiplier
         self._current_position = position
@@ -351,6 +366,8 @@ class BasePrinter:
             position = np.array([position[0], position[1], self.current_position[2]])
         elif len(position) != 3:
             raise RuntimeError(f"Invalid position given: {position} should have either 2 or 3 components.")
+
+        self.__is_position_in_bounds(position)
 
         if self._retraction_length is not None and self._retraction_rate is not None:
             self._command_body(f"G1 E{-self._retraction_length:.5F} F{self._retraction_rate:.0f}")
