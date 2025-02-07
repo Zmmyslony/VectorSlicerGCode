@@ -322,10 +322,14 @@ class BasePrinter:
         length = np.linalg.norm(position - self.current_position)
 
     def __is_position_in_bounds(self, position):
-        if ((self.x_limit is not None and position[0] > self.x_limit) or
-            (self.y_limit is not None and position[1] > self.y_limit) or
-            (self.z_limit is not None and position[2] > self.z_limit)):
-            raise RuntimeError(f"Position {position} is out of bounds [{self.x_limit}, {self.y_limit}, {self.z_limit}] .")
+        if (
+                (self.x_limit is not None and position[0] > self.x_limit) or
+                (self.y_limit is not None and position[1] > self.y_limit) or
+                (self.z_limit is not None and position[2] > self.z_limit) or
+                position[0] < 0 or position[1] < 0 or position[2] < 0
+        ):
+            raise RuntimeError(
+                f"Position {position} is out of bounds [{self.x_limit}, {self.y_limit}, {self.z_limit}] .")
 
     def __printing_move_base(self, position, extrusion_multiplier, speed):
         self.__is_position_in_bounds(position)
