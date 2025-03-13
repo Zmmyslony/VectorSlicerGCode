@@ -31,30 +31,23 @@ import os
 
 VER_MAJOR = 0
 VER_MINOR = 3
-VER_PATCH = 0
+VER_PATCH = 1
 
 _HEADER_FILENAME = "./tmp_header.gcode"
 _BODY_FILENAME = "./tmp_body.gcode"
 _FOOTER_FILENAME = "./tmp_footer.gcode"
 
-_EXT_ONOFF = 0
-"Extrusion is simply switched on or off using E1 or E0"
+_HYREL_NATIVE = 0
 _EXT_ABS_CONST = 1
-"Extrusion is controlled based on absolute E, with constant width and constant speed."
 _EXT_REL_CONST = 2
-"Extrusion is controlled based on relative E, with constant width and constant speed."
 _EXT_ABS_VAR = 3
-"Extrusion is controlled based on absolute E, with variable width and constant speed."
 _EXT_REL_VAR = 4
-"Extrusion is controlled based on relative E, with variable width and constant speed."
 _EXT_ABS_VAR_SPEED = 5
-"Extrusion is controlled based on absolute E, with variable width and variable speed, keeping extrusion rate constant."
 _EXT_REL_VAR_SPEED = 6
-"Extrusion is controlled based on relative E, with variable width and variable speed, keeping extrusion rate constant."
 
 _EXT_WITH_VAR_SPEED = [_EXT_ABS_VAR_SPEED, _EXT_REL_VAR_SPEED]
 "Extrusion types where printing speed is used to control the extrusion width. "
-_EXT_WITH_CONST_W = [_EXT_ABS_CONST, _EXT_REL_CONST, _EXT_ONOFF]
+_EXT_WITH_CONST_W = [_EXT_ABS_CONST, _EXT_REL_CONST, _HYREL_NATIVE]
 "Extrusion types where print width is constant. "
 _EXT_WITH_VAR_W = [_EXT_ABS_VAR, _EXT_REL_VAR, _EXT_ABS_VAR_SPEED, _EXT_REL_VAR_SPEED]
 "Extrusion types where print width is variable"
@@ -64,7 +57,7 @@ _EXT_WITH_ABS_E = [_EXT_ABS_VAR, _EXT_ABS_CONST, _EXT_ABS_VAR_SPEED]
 "Extrusion types where the extrusion is controlled by absolute E value."
 
 ExtrusionTypes = dict(
-    OnOff=_EXT_ONOFF,
+    HyrelNative=_HYREL_NATIVE,
     AbsoluteConstantWidth=_EXT_ABS_CONST,
     RelativeConstantWidth=_EXT_REL_CONST,
     AbsoluteVariableWidth=_EXT_ABS_VAR,
@@ -72,6 +65,15 @@ ExtrusionTypes = dict(
     AbsoluteVariableWidthSpeed=_EXT_ABS_VAR_SPEED,
     RelativeVariableWidthSpeed=_EXT_REL_VAR_SPEED
 )
+""" Types of extrusion control available:\n
+    - OnOff: Extrusion is simply switched on or off using E1 or E0 - Hyrel specific
+    - AbsoluteConstantWidth: Extrusion is controlled based on absolute E, with constant width and constant speed.
+    - RelativeConstantWidth: Extrusion is controlled based on relative E, with constant width and constant speed.
+    - AbsoluteVariableWidth: Extrusion is controlled based on absolute E, with variable width and constant speed.
+    - RelativeVariableWidth: Extrusion is controlled based on relative E, with variable width and constant speed.
+    - AbsoluteVariableWidthSpeed: Extrusion is controlled based on absolute E, with variable width and variable speed, keeping extrusion rate constant.
+    - RelativeVariableWidthSpeed: Extrusion is controlled based on relative E, with variable width and variable speed, keeping extrusion rate constant.
+"""
 
 
 def cross_section(width, height):
@@ -132,7 +134,7 @@ class BasePrinter:
         self._retraction_length = retraction_length
         self._retraction_rate = retraction_rate
 
-        self._is_extrusion_on_off = self._extrusion_control_type == _EXT_ONOFF
+        self._is_extrusion_on_off = self._extrusion_control_type == _HYREL_NATIVE
         self._is_extrusion_absolute = self._extrusion_control_type in _EXT_WITH_ABS_E
         self._is_width_variable = self._extrusion_control_type in _EXT_WITH_VAR_W
         self._is_speed_variable = self._extrusion_control_type in _EXT_WITH_VAR_SPEED
@@ -260,6 +262,16 @@ class BasePrinter:
         time_string = time.strftime("%a, %d %b %Y %H:%M:%S")
         self._comment_header(f"File generated using VectorSlicerGCode version: {VER_MAJOR}.{VER_MINOR}.{VER_PATCH}.")
         self._comment_header(f"Generated on: {time_string}.")
+
+    def _dwell(self, s=None, ms=None):
+        if s is not None:
+            self._command_body(f"G4 S{s:d}")
+            return
+        if ms is not None:
+            self._command_body(f"G4 P{ms:d}")
+            return
+        else:
+            raise RuntimeWarning("No dwell time specified.")
 
     def _break_header(self):
         self.header.write("\n")

@@ -22,7 +22,7 @@ import math
 
 import numpy as np
 
-from lib.gcode.base_printer import BasePrinter, ExtrusionTypes
+from lib.gcode.base_printer import BasePrinter, ExtrusionTypes, _EXT_WITH_REL_E, _EXT_WITH_ABS_E
 
 # Pulses pre microlitre of extruded material taken from
 # https://hyrel3d.com/wiki/index.php/Pulses_per_Microliter on 06.02.2025
@@ -48,10 +48,12 @@ class HyrelPrinter(BasePrinter):
     and contact the code maintainer for support.
     Implementation of a printer with Hyrel-specific GCode commands.
     """
+
     def __init__(self, print_speed, non_print_speed, print_width, layer_thickness, tool_number, nozzle_temperature,
                  uv_duty_cycle, tool_offset, bed_temperature=0, cleaning_lines=17, cleaning_length=20,
                  first_layer_height=None, pulses_per_ul=_100_gear_ratio_pulses, priming_pulses=80000,
-                 extrusion_multiplier=1.0, priming_rate=10000, unpriming_rate=None, height_offset_register=2):
+                 extrusion_multiplier=1.0, priming_rate=10000, unpriming_rate=None, height_offset_register=2,
+                 is_variable_width=False):
         """
         Creates a printer
         :param print_speed: [mm/min]
@@ -75,7 +77,8 @@ class HyrelPrinter(BasePrinter):
         """
         super().__init__(print_speed, non_print_speed, print_width, layer_thickness,
                          first_layer_height=first_layer_height,
-                         extrusion_control_type=ExtrusionTypes["OnOff"])
+                         extrusion_control_type=ExtrusionTypes["HyrelNative"] if is_variable_width else ExtrusionTypes[
+                             "RelativeVariableWidthSpeed"])
 
         self.tool_number = tool_number
         self.priming_pulses = priming_pulses
@@ -111,8 +114,23 @@ class HyrelPrinter(BasePrinter):
 
         self._break_body()
         self._comment_body("Configuring flow.")
-        self._command_body(f"M221 T{_tool_number_m_command(tool):d} W{path_width:.3f} "
-                           f"Z{layer_thickness:.3f} S{flow_multiplier:.3f} P{pulses_per_ul:d}")
+        if self._extrusion_control_type == ExtrusionTypes["HyrelNative"]:
+            self._command_body(f"M229 E0 D0")
+            self._command_body(f"M221 T{_tool_number_m_command(tool):d} W{path_width:.3f} "
+                               f"Z{layer_thickness:.3f} S{flow_multiplier:.3f} P{pulses_per_ul:d}")
+            self._dwell(ms=1)
+        elif self._extrusion_control_type in _EXT_WITH_REL_E:
+            self._command_body(f"M229 E1 D1")
+            self._set_relative_extrusion()
+        elif self._extrusion_control_type in _EXT_WITH_ABS_E:
+            self._command_body(f"M229 E1 D1")
+            self._set_absolute_extrusion()
+        else:
+            raise RuntimeError("Unknown extrusion control type.")
+
+        if self._extrusion_control_type in {ExtrusionTypes["AbsoluteVariableWidth"],
+                                            ExtrusionTypes["RelativeVariableWidth"]}:
+            raise RuntimeWarning("Variable width with constant speed is not recommended for DIW printing.")
 
     def __set_nozzle_temperature(self, temperature: float = None, tool_number: int = None):
         if temperature is None: temperature = self.nozzle_temperature
@@ -178,9 +196,11 @@ class HyrelPrinter(BasePrinter):
         self._comment_body("Configuring priming.")
         self._command_body(
             f"M722 T{_tool_number_m_command(tool_number)} S{pulse_rate:d} E{number_of_pulses:d} P{dwell_time:d}")
+        self._dwell(ms=1)
         if is_executed_immediately:
             self._comment_body("Priming now.")
             self._command_body(f"M722 T{_tool_number_m_command(tool_number)} I1")
+            self._dwell(ms=1)
 
     def __configure_unprime(self, pulse_rate: int, number_of_pulses: int, dwell_time: int,
                             is_executed_immediately: bool = False, tool_number: int = None):
@@ -192,9 +212,11 @@ class HyrelPrinter(BasePrinter):
         self._comment_body("Configuring unpriming.")
         self._command_body(
             f"M721 T{_tool_number_m_command(tool_number)} S{pulse_rate:d} E{number_of_pulses:d} P{dwell_time:d}")
+        self._dwell(ms=1)
         if is_executed_immediately:
             self._comment_body("Unpriming now.")
             self._command_body(f"M721 T{_tool_number_m_command(tool_number)} I1")
+            self._dwell(ms=1)
 
     def __disable_priming(self, tool_number: int = None):
         if tool_number is None: tool_number = self.tool_number
