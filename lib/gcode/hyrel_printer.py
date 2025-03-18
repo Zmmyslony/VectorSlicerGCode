@@ -77,7 +77,7 @@ class HyrelPrinter(BasePrinter):
         """
         super().__init__(print_speed, non_print_speed, print_width, layer_thickness,
                          first_layer_height=first_layer_height,
-                         extrusion_control_type=ExtrusionTypes["HyrelNative"] if is_variable_width else ExtrusionTypes[
+                         extrusion_control_type=ExtrusionTypes["HyrelNative"] if not is_variable_width else ExtrusionTypes[
                              "RelativeVariableWidthSpeed"])
 
         self.tool_number = tool_number
