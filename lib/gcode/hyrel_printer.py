@@ -50,7 +50,7 @@ class HyrelPrinter(BasePrinter):
     """
 
     def __init__(self, print_speed, non_print_speed, print_width, layer_thickness, tool_number, nozzle_temperature,
-                 uv_duty_cycle, tool_offset, bed_temperature=0, cleaning_lines=17, cleaning_length=20,
+                 uv_duty_cycle, tool_offset, bed_temperature=0, cleaning_lines=16, cleaning_length=20,
                  first_layer_height=None, pulses_per_ul=_100_gear_ratio_pulses, priming_pulses=80000,
                  extrusion_multiplier=1.0, priming_rate=10000, unpriming_rate=None, height_offset_register=2,
                  is_variable_width=False):
@@ -65,7 +65,7 @@ class HyrelPrinter(BasePrinter):
         :param uv_duty_cycle: 0-100%
         :param tool_offset: Position of the new [0, 0, 0] position with respect to homed positions.
         :param bed_temperature: [C]
-        :param cleaning_lines: [Integer] best to keep odd
+        :param cleaning_lines: [Integer] best to keep even
         :param cleaning_length: [mm]
         :param first_layer_height: [mm]
         :param pulses_per_ul: KR-15 default: 1297
@@ -117,19 +117,17 @@ class HyrelPrinter(BasePrinter):
         self._comment_body("Configuring flow.")
         if self._extrusion_type.is_native_hyrel:
             self._command_body(f"M229 E0 D0")
-            self._command_body(f"M221 T{_tool_number_m_command(tool):d} W{path_width:.3f} "
-                               f"Z{layer_thickness:.3f} S{flow_multiplier:.3f} P{pulses_per_ul:d}")
-            self._dwell(ms=1)
-        elif self._extrusion_type.is_relative:
-            self._command_body(f"M229 E1 D1")
-            self._command_body(f"M221 T{_tool_number_m_command(tool):d} W{path_width:.3f} "
-                               f"Z{layer_thickness:.3f} S{flow_multiplier:.3f} P{pulses_per_ul:d}")
-            self._set_relative_extrusion()
         else:
             self._command_body(f"M229 E1 D1")
-            self._command_body(f"M221 T{_tool_number_m_command(tool):d} W{path_width:.3f} "
-                               f"Z{layer_thickness:.3f} S{flow_multiplier:.3f} P{pulses_per_ul:d}")
+
+        if self._extrusion_type.is_relative:
+            self._set_relative_extrusion()
+        else:
             self._set_absolute_extrusion()
+
+        self._command_body(f"M221 T{_tool_number_m_command(tool):d} W{path_width:.3f} "
+                           f"Z{layer_thickness:.3f} S{flow_multiplier:.3f} P{pulses_per_ul:d}")
+        self._dwell(ms=1)
 
         if self._extrusion_type.is_variable_width and not self._extrusion_type.is_variable_speed:
             raise RuntimeWarning("Variable width with constant speed is not recommended for DIW printing.")
@@ -230,7 +228,11 @@ class HyrelPrinter(BasePrinter):
 
     def __generate_secondary_header(self):
         self._break_header()
-        self._comment_header("File generated for use with a Hyrel printer.")
+        self._comment_header("This file was generated for use with a Hyrel printer.")
+        if self._extrusion_type.is_native_hyrel:
+            self._comment_header("Extrusion using on Hyrel's native calculation")
+        else:
+            self._comment_header("Extrusion using constant flow and variable width and speed")
 
         self._comment_header(f"Default printing tool: T{self.tool_number} (T1{self.tool_number + 1}).")
         self._comment_header(f"Path width: {self._print_width} mm.")
