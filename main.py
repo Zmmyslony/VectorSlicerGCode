@@ -38,7 +38,7 @@ def example_prusa_mk4s(pattern_name):
     # The header and footer are taken from pre-generated files.
     prusa_header = open("./input/mk4s_PLA_header.txt", "r").read()
     prusa_footer = open("./input/mk4s_PLA_footer.txt", "r").read()
-    prusa.slice_pattern(pattern, 8, offset=[20, 20])
+    prusa.slice_pattern(pattern, 8, position=[20, 20])
 
     prusa.export(f"{pattern_name}_mk4s.gcode", header_supplement=prusa_header, footer_supplement=prusa_footer)
 
