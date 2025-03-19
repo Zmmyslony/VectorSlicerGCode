@@ -22,7 +22,7 @@ import math
 
 import numpy as np
 
-from lib.gcode.base_printer import BasePrinter, ExtrusionTypes, _EXT_WITH_REL_E, _EXT_WITH_ABS_E
+from lib.gcode.base_printer import BasePrinter, ExtrusionType
 
 # Pulses pre microlitre of extruded material taken from
 # https://hyrel3d.com/wiki/index.php/Pulses_per_Microliter on 06.02.2025
@@ -77,8 +77,8 @@ class HyrelPrinter(BasePrinter):
         """
         super().__init__(print_speed, non_print_speed, print_width, layer_thickness,
                          first_layer_height=first_layer_height,
-                         extrusion_control_type=ExtrusionTypes["HyrelNative"] if not is_variable_width else ExtrusionTypes[
-                             "RelativeVariableWidthSpeed"])
+                         extrusion_type=ExtrusionType(is_native_hyrel=True) if not is_variable_width else
+                         ExtrusionType(is_variable_width=True, is_variable_speed=True, is_volumetric=True, is_relative=True))
 
         self.tool_number = tool_number
         self.priming_pulses = priming_pulses
@@ -112,24 +112,26 @@ class HyrelPrinter(BasePrinter):
         if flow_multiplier is None: flow_multiplier = self.extrusion_multiplier
         if pulses_per_ul is None: pulses_per_ul = self.pulses_per_ul
 
+
         self._break_body()
         self._comment_body("Configuring flow.")
-        if self._extrusion_control_type == ExtrusionTypes["HyrelNative"]:
+        if self._extrusion_type.is_native_hyrel:
             self._command_body(f"M229 E0 D0")
             self._command_body(f"M221 T{_tool_number_m_command(tool):d} W{path_width:.3f} "
                                f"Z{layer_thickness:.3f} S{flow_multiplier:.3f} P{pulses_per_ul:d}")
             self._dwell(ms=1)
-        elif self._extrusion_control_type in _EXT_WITH_REL_E:
+        elif self._extrusion_type.is_relative:
             self._command_body(f"M229 E1 D1")
+            self._command_body(f"M221 T{_tool_number_m_command(tool):d} W{path_width:.3f} "
+                               f"Z{layer_thickness:.3f} S{flow_multiplier:.3f} P{pulses_per_ul:d}")
             self._set_relative_extrusion()
-        elif self._extrusion_control_type in _EXT_WITH_ABS_E:
-            self._command_body(f"M229 E1 D1")
-            self._set_absolute_extrusion()
         else:
-            raise RuntimeError("Unknown extrusion control type.")
+            self._command_body(f"M229 E1 D1")
+            self._command_body(f"M221 T{_tool_number_m_command(tool):d} W{path_width:.3f} "
+                               f"Z{layer_thickness:.3f} S{flow_multiplier:.3f} P{pulses_per_ul:d}")
+            self._set_absolute_extrusion()
 
-        if self._extrusion_control_type in {ExtrusionTypes["AbsoluteVariableWidth"],
-                                            ExtrusionTypes["RelativeVariableWidth"]}:
+        if self._extrusion_type.is_variable_width and not self._extrusion_type.is_variable_speed:
             raise RuntimeWarning("Variable width with constant speed is not recommended for DIW printing.")
 
     def __set_nozzle_temperature(self, temperature: float = None, tool_number: int = None):

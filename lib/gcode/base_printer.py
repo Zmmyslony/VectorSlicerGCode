@@ -37,43 +37,15 @@ _HEADER_FILENAME = "./tmp_header.gcode"
 _BODY_FILENAME = "./tmp_body.gcode"
 _FOOTER_FILENAME = "./tmp_footer.gcode"
 
-_HYREL_NATIVE = 0
-_EXT_ABS_CONST = 1
-_EXT_REL_CONST = 2
-_EXT_ABS_VAR = 3
-_EXT_REL_VAR = 4
-_EXT_ABS_VAR_SPEED = 5
-_EXT_REL_VAR_SPEED = 6
 
-_EXT_WITH_VAR_SPEED = [_EXT_ABS_VAR_SPEED, _EXT_REL_VAR_SPEED]
-"Extrusion types where printing speed is used to control the extrusion width. "
-_EXT_WITH_CONST_W = [_EXT_ABS_CONST, _EXT_REL_CONST, _HYREL_NATIVE]
-"Extrusion types where print width is constant. "
-_EXT_WITH_VAR_W = [_EXT_ABS_VAR, _EXT_REL_VAR, _EXT_ABS_VAR_SPEED, _EXT_REL_VAR_SPEED]
-"Extrusion types where print width is variable"
-_EXT_WITH_REL_E = [_EXT_REL_CONST, _EXT_REL_VAR, _EXT_REL_VAR_SPEED]
-"Extrusion types where the extrusion is controlled by relative E value."
-_EXT_WITH_ABS_E = [_EXT_ABS_VAR, _EXT_ABS_CONST, _EXT_ABS_VAR_SPEED]
-"Extrusion types where the extrusion is controlled by absolute E value."
+class ExtrusionType():
+    def __init__(self, is_relative=False, is_variable_width=False, is_variable_speed=False, is_volumetric=False, is_native_hyrel=False):
+        self.is_native_hyrel = is_native_hyrel
+        self.is_relative = is_relative
+        self.is_volumetric = is_volumetric
+        self.is_variable_width = is_variable_width
+        self.is_variable_speed = is_variable_speed
 
-ExtrusionTypes = dict(
-    HyrelNative=_HYREL_NATIVE,
-    AbsoluteConstantWidth=_EXT_ABS_CONST,
-    RelativeConstantWidth=_EXT_REL_CONST,
-    AbsoluteVariableWidth=_EXT_ABS_VAR,
-    RelativeVariableWidth=_EXT_REL_VAR,
-    AbsoluteVariableWidthSpeed=_EXT_ABS_VAR_SPEED,
-    RelativeVariableWidthSpeed=_EXT_REL_VAR_SPEED
-)
-""" Types of extrusion control available:\n
-    - OnOff: Extrusion is simply switched on or off using E1 or E0 - Hyrel specific
-    - AbsoluteConstantWidth: Extrusion is controlled based on absolute E, with constant width and constant speed.
-    - RelativeConstantWidth: Extrusion is controlled based on relative E, with constant width and constant speed.
-    - AbsoluteVariableWidth: Extrusion is controlled based on absolute E, with variable width and constant speed.
-    - RelativeVariableWidth: Extrusion is controlled based on relative E, with variable width and constant speed.
-    - AbsoluteVariableWidthSpeed: Extrusion is controlled based on absolute E, with variable width and variable speed, keeping extrusion rate constant.
-    - RelativeVariableWidthSpeed: Extrusion is controlled based on relative E, with variable width and variable speed, keeping extrusion rate constant.
-"""
 
 
 def cross_section(width, height):
@@ -98,12 +70,13 @@ class BasePrinter:
                  lift_off_height=2,
                  extrusion_multiplier=1,
                  filament_diameter=1.75,
-                 extrusion_control_type: int = ExtrusionTypes['RelativeConstantWidth'],
+                 extrusion_type: ExtrusionType = ExtrusionType(),
                  retraction_length=None,
                  retraction_rate=None,
                  x_limit=None,
                  y_limit=None,
-                 z_limit=None):
+                 z_limit=None,
+                 material_density=1.25):
         self._print_speed = print_speed
         self._non_print_speed = non_print_speed
         self._print_width = print_width
@@ -111,6 +84,7 @@ class BasePrinter:
         self._first_layer_thickness = layer_thickness if first_layer_height is None else first_layer_height
         self._filament_cross_section = np.pi * filament_diameter ** 2 / 4
         self._reference_cross_section = cross_section(print_width, layer_thickness)
+        self.__material_density = material_density
 
         self.header = open(_HEADER_FILENAME + "_tmp", "w")
         self.body = open(_BODY_FILENAME + "_tmp", "w")
@@ -120,8 +94,8 @@ class BasePrinter:
         self.print_time = 0
         self.print_distance = 0
         self.non_print_distance = 0
-        self.extrusion_distance = 0
-        self._total_extrusion_distance = 0
+        self.extrusion_amount = 0
+        self._total_extrusion_amount = 0
 
         self._physical_pixel_size = physical_pixel_size
         self._lift_off_distance = lift_off_distance
@@ -129,15 +103,10 @@ class BasePrinter:
         self._generate_header()
         self._start_time = time.time()
         self._extrusion_multiplier = extrusion_multiplier
-        self._extrusion_control_type = extrusion_control_type
+        self._extrusion_type = extrusion_type
 
         self._retraction_length = retraction_length
         self._retraction_rate = retraction_rate
-
-        self._is_extrusion_on_off = self._extrusion_control_type == _HYREL_NATIVE
-        self._is_extrusion_absolute = self._extrusion_control_type in _EXT_WITH_ABS_E
-        self._is_width_variable = self._extrusion_control_type in _EXT_WITH_VAR_W
-        self._is_speed_variable = self._extrusion_control_type in _EXT_WITH_VAR_SPEED
 
         self.x_limit = x_limit
         self.y_limit = y_limit
@@ -167,6 +136,15 @@ class BasePrinter:
         self._comment_header(
             f"Total non-printing distance: {self.non_print_distance:.1f} mm at {self._non_print_speed} mm/min.")
 
+
+        extrusion_amount = self._total_extrusion_amount + self.extrusion_amount
+        extrusion_volume = extrusion_amount if self._extrusion_type.is_volumetric else extrusion_amount * self._filament_cross_section
+        if extrusion_volume < 1000:
+            self._comment_header(f"Total extrusion amount: {extrusion_volume:.2f} ul (approx {extrusion_volume * self.__material_density:.2f} mg).")
+        else:
+            self._comment_header(
+                f"Total extrusion amount: {extrusion_volume / 1000:.2f} ml (approx {extrusion_volume * self.__material_density / 1000:.2f} g).")
+
         h_name = self.header.name
         b_name = self.body.name
         f_name = self.footer.name
@@ -189,12 +167,12 @@ class BasePrinter:
         os.remove(b_name)
         os.remove(f_name)
 
-    def slice_pattern(self, pattern: Pattern, layers: int, offset: list = None, **kwargs):
+    def slice_pattern(self, pattern: Pattern, layers: int, position: list = None, **kwargs):
         """
         Slices the pattern
         :param pattern:
         :param layers: Number of layers to generate the output with.
-        :param offset: Position in mm to which the pattern should be moved. Usually, the pattern extends from [0, 0] in positive direction.
+        :param position: Position in mm to which the pattern should be moved. Usually, the pattern extends from [0, 0] in positive direction.
         :param kwargs:
         :return:
         """
@@ -204,8 +182,8 @@ class BasePrinter:
         self._comment_body(f"Slicing pattern \"{pattern.pattern_name}\"")
         pattern_copy = deepcopy(pattern)
         pattern_copy.scale(self._physical_pixel_size)
-        if offset is not None:
-            pattern_copy.move(offset)
+        if position is not None:
+            pattern_copy.move(position)
 
         if hasattr(layers, '__iter__'):
             i_layers = [layer % pattern_copy.layer_count for layer in layers]
@@ -249,8 +227,8 @@ class BasePrinter:
         self._command_body("M82")
 
     def _reset_extrusion_status(self):
-        self._total_extrusion_distance += self.extrusion_distance
-        self.extrusion_distance = 0
+        self._total_extrusion_amount += self.extrusion_amount
+        self.extrusion_amount = 0
         self._command_body("G92 E0")
 
     def _set_relative_extrusion(self):
@@ -308,23 +286,26 @@ class BasePrinter:
     def _printing_move_3d_variable_width(self, position, width, speed=None):
         length = np.linalg.norm(position - self.current_position)
         path_cross_section = cross_section(width, self._layer_thickness)
-        extrusion_amount = length * path_cross_section / self._filament_cross_section * self._extrusion_multiplier
+        if self._extrusion_type.is_volumetric:
+            extrusion_amount = length * path_cross_section * self._extrusion_multiplier
+        else:
+            extrusion_amount = length * path_cross_section / self._filament_cross_section * self._extrusion_multiplier
 
-        self.extrusion_distance += extrusion_amount
+        self.extrusion_amount += extrusion_amount
         print_speed = self._print_speed if speed is None else speed
 
-        if self._is_speed_variable:
+        if self._extrusion_type.is_variable_speed:
             print_speed *= self._reference_cross_section / path_cross_section
 
         self.print_distance += length
         self.print_time += length / print_speed
         command = f"G1 X{position[0]:.3f} Y{position[1]:.3f} Z{position[2]:.3f}"
-        if self._extrusion_control_type in _EXT_WITH_ABS_E:
-            command += f" E{self.extrusion_distance:.5f}"
-        elif self._extrusion_control_type in _EXT_WITH_REL_E:
+        if self._extrusion_type.is_native_hyrel:
+            command += " E1"
+        elif self._extrusion_type.is_relative:
             command += f" E{extrusion_amount:.5f}"
         else:
-            command += " E1"
+            command += f" E{self.extrusion_amount:.5f}"
 
         command += f" F{print_speed:.0f}"
         self.current_position = position
@@ -363,7 +344,7 @@ class BasePrinter:
         return self._printing_move_variable_width(position, self._print_width, speed=speed)
 
     def _printing_move(self, position, speed=None, width=None):
-        if width is not None and self._extrusion_control_type in _EXT_WITH_VAR_W:
+        if width is not None and self._extrusion_type.is_variable_width:
             return self._printing_move_variable_width(position, self._print_width, speed=speed)
         else:
             return self._printing_move_constant_width(position, speed=speed)
@@ -448,7 +429,7 @@ class BasePrinter:
         if speed is None: speed = self._print_speed
 
         for i, position in enumerate(path.path_coordinates):
-            if path.overlap is None or self._extrusion_control_type in _EXT_WITH_CONST_W:
+            if path.overlap is None or not self._extrusion_type.is_variable_width:
                 self._printing_move(position, speed=speed)
             else:
                 width = self._print_width * (1 - path.overlap[i] / 2)
