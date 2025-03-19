@@ -190,7 +190,6 @@ class BasePrinter:
         else:
             i_layers = [i % pattern_copy.layer_count for i in range(layers)]
 
-        self._non_printing_move(pattern_copy.get_origin())
         self._z_move(kwargs.get('first_layer_thickness', self._first_layer_thickness))
 
         for i, i_layer in enumerate(i_layers):
@@ -215,6 +214,8 @@ class BasePrinter:
                              "initialisation or by slicing using a Pattern class object.")
 
         self._comment_body("Beginning a new layer.")
+        if np.linalg.norm(self.current_position[:2] - layer.get_end()) < np.linalg.norm(self.current_position[:2] - layer.get_beginning()):
+            layer.invert()
 
         for path in layer.print_paths:
             self._comment_body("Moving to the next path.")

@@ -96,3 +96,9 @@ class Layer:
             path.rotate(angle, centre)
         self.__update_properties()
 
+    def get_beginning(self):
+        return self.print_paths[0].start()
+
+    def get_end(self):
+        return self.print_paths[-1].end()
+
