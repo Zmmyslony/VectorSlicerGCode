@@ -32,5 +32,6 @@ class PrusaPrinter(BasePrinter):
         BasePrinter.__init__(self, print_speed, non_print_speed, print_width, layer_thickness,
                              lift_off_distance=lift_off_distance, lift_off_height=lift_off_height,
                              filament_diameter=filament_diameter,
-                             extrusion_type=ExtrusionType(is_variable_width=True, is_variable_speed=True),
+                             extrusion_type=ExtrusionType(is_variable_width=True, is_variable_speed=True,
+                                                          is_relative=True),
                              retraction_rate=1500, retraction_length=1, x_limit=250, y_limit=210, z_limit=220)
