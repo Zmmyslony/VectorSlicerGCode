@@ -30,8 +30,8 @@ from pathlib import Path
 import os
 
 VER_MAJOR = 0
-VER_MINOR = 3
-VER_PATCH = 1
+VER_MINOR = 4
+VER_PATCH = 0
 
 _HEADER_FILENAME = "./tmp_header.gcode"
 _BODY_FILENAME = "./tmp_body.gcode"
@@ -39,13 +39,13 @@ _FOOTER_FILENAME = "./tmp_footer.gcode"
 
 
 class ExtrusionType():
-    def __init__(self, is_relative=False, is_variable_width=False, is_variable_speed=False, is_volumetric=False, is_native_hyrel=False):
+    def __init__(self, is_relative=False, is_variable_width=False, is_variable_speed=False, is_volumetric=False,
+                 is_native_hyrel=False):
         self.is_native_hyrel = is_native_hyrel
         self.is_relative = is_relative
         self.is_volumetric = is_volumetric
         self.is_variable_width = is_variable_width
         self.is_variable_speed = is_variable_speed
-
 
 
 def cross_section(width, height):
@@ -62,7 +62,6 @@ class BasePrinter:
     __body = None
     __footer = None
     __is_initialised = False
-
 
     def __init__(self,
                  print_speed,
@@ -119,7 +118,6 @@ class BasePrinter:
         self._start_time = time.time()
         self.__is_initialised = True
 
-
     def _create_container_files(self):
         self.__header = open(_HEADER_FILENAME, "w")
         self.__body = open(_BODY_FILENAME, "w")
@@ -159,11 +157,11 @@ class BasePrinter:
         self._comment_header(
             f"Total non-printing distance: {self.non_print_distance:.1f} mm at {self._non_print_speed} mm/min.")
 
-
         extrusion_amount = self._total_extrusion_amount + self.extrusion_amount
         extrusion_volume = extrusion_amount if self._extrusion_type.is_volumetric else extrusion_amount * self._filament_cross_section
         if extrusion_volume < 1000:
-            self._comment_header(f"Total extrusion amount: {extrusion_volume:.2f} ul (approx {extrusion_volume * self.__material_density:.2f} mg).")
+            self._comment_header(
+                f"Total extrusion amount: {extrusion_volume:.2f} ul (approx {extrusion_volume * self.__material_density:.2f} mg).")
         else:
             self._comment_header(
                 f"Total extrusion amount: {extrusion_volume / 1000:.2f} ml (approx {extrusion_volume * self.__material_density / 1000:.2f} g).")
@@ -187,7 +185,6 @@ class BasePrinter:
         f.close()
 
         self._delete_container_files()
-
 
     def slice_pattern(self, pattern: Pattern, layers: int, position: list = None, **kwargs):
         """
@@ -240,7 +237,8 @@ class BasePrinter:
                              "initialisation or by slicing using a Pattern class object.")
 
         self._comment_body("Beginning a new layer.")
-        if np.linalg.norm(self.current_position[:2] - layer.get_end()) < np.linalg.norm(self.current_position[:2] - layer.get_beginning()):
+        if np.linalg.norm(self.current_position[:2] - layer.get_end()) < np.linalg.norm(
+                self.current_position[:2] - layer.get_beginning()):
             layer.invert()
 
         for path in layer.print_paths:
