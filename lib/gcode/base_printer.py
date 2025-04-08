@@ -58,6 +58,11 @@ class BasePrinter:
     """
     Base printer object that should be configured before using.
     """
+    __header = None
+    __body = None
+    __footer = None
+    __is_initialised = False
+
 
     def __init__(self,
                  print_speed,
@@ -86,10 +91,6 @@ class BasePrinter:
         self._reference_cross_section = cross_section(print_width, layer_thickness)
         self.__material_density = material_density
 
-        self.header = open(_HEADER_FILENAME + "_tmp", "w")
-        self.body = open(_BODY_FILENAME + "_tmp", "w")
-        self.footer = open(_FOOTER_FILENAME + "_tmp", "w")
-
         self.current_position = np.array([0, 0, 0], dtype=np.float32)
         self.print_time = 0
         self.print_distance = 0
@@ -100,8 +101,6 @@ class BasePrinter:
         self._physical_pixel_size = physical_pixel_size
         self._lift_off_distance = lift_off_distance
         self._lift_off_height = lift_off_height
-        self._generate_header()
-        self._start_time = time.time()
         self._extrusion_multiplier = extrusion_multiplier
         self._extrusion_type = extrusion_type
 
@@ -111,6 +110,30 @@ class BasePrinter:
         self.x_limit = x_limit
         self.y_limit = y_limit
         self.z_limit = z_limit
+
+        self._init()
+
+    def _init(self):
+        self._create_container_files()
+        self._generate_header()
+        self._start_time = time.time()
+        self.__is_initialised = True
+
+
+    def _create_container_files(self):
+        self.__header = open(_HEADER_FILENAME, "w")
+        self.__body = open(_BODY_FILENAME, "w")
+        self.__footer = open(_FOOTER_FILENAME, "w")
+
+    def _delete_container_files(self):
+        os.remove(self.__header.name)
+        os.remove(self.__body.name)
+        os.remove(self.__footer.name)
+
+        self.__header = None
+        self.__body = None
+        self.__footer = None
+        self.__is_initialised = False
 
     def export(self, filename: str, header_supplement: str = None, body_supplement: str = None,
                footer_supplement: str = None):
@@ -124,8 +147,8 @@ class BasePrinter:
         :return:
         """
         output_directory = Path("./output")
-        if not output_directory.exists():
-            os.mkdir(output_directory)
+        if not output_directory.exists(): os.mkdir(output_directory)
+
         seconds = int(self.print_time * 60) % 60
         minutes = int(self.print_time) % 60
         hours = int(self.print_time / 60) % 60
@@ -145,12 +168,12 @@ class BasePrinter:
             self._comment_header(
                 f"Total extrusion amount: {extrusion_volume / 1000:.2f} ml (approx {extrusion_volume * self.__material_density / 1000:.2f} g).")
 
-        h_name = self.header.name
-        b_name = self.body.name
-        f_name = self.footer.name
-        self.header.close()
-        self.body.close()
-        self.footer.close()
+        h_name = self.__header.name
+        b_name = self.__body.name
+        f_name = self.__footer.name
+        self.__header.close()
+        self.__body.close()
+        self.__footer.close()
 
         f = open(output_directory / filename, 'w')
         f.write(open(h_name, "r").read())
@@ -163,9 +186,8 @@ class BasePrinter:
         if footer_supplement is not None: f.write(footer_supplement)
         f.close()
 
-        os.remove(h_name)
-        os.remove(b_name)
-        os.remove(f_name)
+        self._delete_container_files()
+
 
     def slice_pattern(self, pattern: Pattern, layers: int, position: list = None, **kwargs):
         """
@@ -176,8 +198,12 @@ class BasePrinter:
         :param kwargs:
         :return:
         """
+        if layers <= 0:
+            raise RuntimeError("Pattern cannot be sliced with non-positive number of layers.")
+        if not self.__is_initialised:
+            self._init()
         self._start_time = time.time()
-        if layers <= 0: raise RuntimeError("Pattern cannot be sliced with non-positive number of layers.")
+
         self._physical_pixel_size = self._print_width / pattern.pixel_path_width
         self._comment_body(f"Slicing pattern \"{pattern.pattern_name}\"")
         pattern_copy = deepcopy(pattern)
@@ -253,28 +279,28 @@ class BasePrinter:
             raise RuntimeWarning("No dwell time specified.")
 
     def _break_header(self):
-        self.header.write("\n")
+        self.__header.write("\n")
 
     def _break_body(self):
-        self.body.write("\n")
+        self.__body.write("\n")
 
     def _comment_body(self, content):
-        self.body.write(f"; {content}\n")
+        self.__body.write(f"; {content}\n")
 
     def _comment_header(self, content):
-        self.header.write(f"; {content}\n")
+        self.__header.write(f"; {content}\n")
 
     def _comment_footer(self, content):
-        self.footer.write(f"; {content}\n")
+        self.__footer.write(f"; {content}\n")
 
     def _command_body(self, content):
-        self.body.write(f"{content}\n")
+        self.__body.write(f"{content}\n")
 
     def _command_header(self, content):
-        self.header.write(f"{content}\n")
+        self.__header.write(f"{content}\n")
 
     def _command_footer(self, content):
-        self.footer.write(f"{content}\n")
+        self.__footer.write(f"{content}\n")
 
     def _z_move(self, height, speed=None):
         new_position = copy(self.current_position)
@@ -438,8 +464,13 @@ class BasePrinter:
 
     def import_header(self, header_path):
         header_file = open(header_path, 'r')
-        self.header += header_file.read()
+        self.__header += header_file.read()
 
     def import_footer(self, footer_path):
         footer_file = open(footer_path, 'r')
-        self.footer += footer_file.read()
+        self.__footer += footer_file.read()
+
+    def _empty_containers(self):
+        self.__header = ""
+        self.__body = ""
+        self.__footer = ""

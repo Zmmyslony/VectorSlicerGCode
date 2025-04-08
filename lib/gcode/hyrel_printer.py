@@ -23,6 +23,7 @@ import math
 import numpy as np
 
 from lib.gcode.base_printer import BasePrinter, ExtrusionType
+from pattern_reading.pattern import Pattern
 
 # Pulses pre microlitre of extruded material taken from
 # https://hyrel3d.com/wiki/index.php/Pulses_per_Microliter on 06.02.2025
@@ -48,6 +49,7 @@ class HyrelPrinter(BasePrinter):
     and contact the code maintainer for support.
     Implementation of a printer with Hyrel-specific GCode commands.
     """
+    _is_hyrel_initialised = False
 
     def __init__(self, print_speed, non_print_speed, print_width, layer_thickness, tool_number, nozzle_temperature,
                  uv_duty_cycle, tool_offset, bed_temperature=0, cleaning_lines=16, cleaning_length=20,
@@ -75,11 +77,7 @@ class HyrelPrinter(BasePrinter):
         :param unpriming_rate: [pulses/s] if None, priming_rate will be used
         :param height_offset_register: Index at which Repetrel will register the height offset
         """
-        super().__init__(print_speed, non_print_speed, print_width, layer_thickness,
-                         first_layer_height=first_layer_height,
-                         extrusion_type=ExtrusionType(is_native_hyrel=True) if not is_variable_width else
-                         ExtrusionType(is_variable_width=True, is_variable_speed=True, is_volumetric=True, is_relative=True))
-
+        self._tool_offset = tool_offset
         self.tool_number = tool_number
         self.priming_pulses = priming_pulses
         self.bed_temperature = bed_temperature
@@ -95,9 +93,16 @@ class HyrelPrinter(BasePrinter):
 
         self.height_offset_register = height_offset_register
 
-        self.__generate_secondary_header()
+        super().__init__(print_speed, non_print_speed, print_width, layer_thickness,
+                         first_layer_height=first_layer_height,
+                         extrusion_type=ExtrusionType(is_native_hyrel=True) if not is_variable_width else
+                         ExtrusionType(is_variable_width=True, is_variable_speed=True, is_volumetric=True, is_relative=True))
 
-        self._initial_configuration(tool_offset)
+    def _init(self):
+        super()._init()
+        self.__generate_secondary_header()
+        self._initial_configuration(self._tool_offset)
+        self._is_hyrel_initialised = True
 
     def __set_units_to_millimetres(self):
         self._break_body()
@@ -394,3 +399,6 @@ class HyrelPrinter(BasePrinter):
     def export(self, filename, header_supplement=None, body_supplement=None, footer_supplement=None):
         self._finish_print()
         super().export(filename, header_supplement, body_supplement, footer_supplement)
+        self._is_hyrel_initialised = False
+
+
