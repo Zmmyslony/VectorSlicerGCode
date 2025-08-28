@@ -44,5 +44,5 @@ def example_prusa_mk4s(pattern_name):
 
 
 if __name__ == '__main__':
-    example_hyrel_30m("azimuthal_10_mm")
-    example_prusa_mk4s("azimuthal_10_mm")
+    example_hyrel_30m("radial_r_5_mm")
+    example_prusa_mk4s("radial_r_5_mm")
