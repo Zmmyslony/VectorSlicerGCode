@@ -22,16 +22,17 @@ import random
 
 import numpy as np
 from copy import deepcopy, copy
-from lib.pattern_reading.layer import Layer
-from lib.pattern_reading.print_path import PrintPath
-from lib.pattern_reading.pattern import Pattern
 import time
 from pathlib import Path
 import os
 
+from lib.pattern_reading.layer import Layer
+from lib.pattern_reading.print_path import PrintPath
+from lib.pattern_reading.pattern import Pattern
+
 VER_MAJOR = 0
 VER_MINOR = 4
-VER_PATCH = 0
+VER_PATCH = 1
 
 _HEADER_FILENAME = "./tmp_header.gcode"
 _BODY_FILENAME = "./tmp_body.gcode"
@@ -110,7 +111,7 @@ class BasePrinter:
         self.y_limit = y_limit
         self.z_limit = z_limit
 
-        self._init()
+        # self._init()
 
     def _init(self):
         self._create_container_files()
@@ -269,9 +270,11 @@ class BasePrinter:
     def _dwell(self, s=None, ms=None):
         if s is not None:
             self._command_body(f"G4 S{s:d}")
+            self.print_time += s / 60
             return
         if ms is not None:
             self._command_body(f"G4 P{ms:d}")
+            self.print_time += ms / 1000 / 60
             return
         else:
             raise RuntimeWarning("No dwell time specified.")
@@ -293,6 +296,9 @@ class BasePrinter:
 
     def _command_body(self, content):
         self.__body.write(f"{content}\n")
+
+    def _commented_command_body(self, command, comment):
+        self.__body.write(f"{command}; {comment}\n")
 
     def _command_header(self, content):
         self.__header.write(f"{content}\n")
@@ -424,12 +430,15 @@ class BasePrinter:
         self._non_printing_move(self.current_position + displacement, speed=speed)
 
     def _set_relative_positioning(self):
-        self._comment_body("Switching to relative positioning.")
-        self._command_body("G91")
+        comment = "Switching to relative positioning."
+        command = "G91"
+
+        self._commented_command_body(command, comment)
 
     def _set_absolute_positioning(self):
-        self._comment_body("Switching to absolute positioning.")
-        self._command_body("G90")
+        comment = "Switching to absolute positioning."
+        command = "G90"
+        self._commented_command_body(command, comment)
 
     def _home_2d(self):
         self._break_body()
