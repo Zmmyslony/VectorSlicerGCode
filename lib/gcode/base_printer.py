@@ -187,7 +187,7 @@ class BasePrinter:
 
         self._delete_container_files()
 
-    def slice_pattern(self, pattern: Pattern, layers: int, position: list = None, **kwargs):
+    def slice_pattern(self, pattern: Pattern, layers: int, position: list, **kwargs):
         """
         Slices the pattern
         :param pattern:
