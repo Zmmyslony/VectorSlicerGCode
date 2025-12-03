@@ -25,20 +25,18 @@ from lib.gcode.hyrel_printer import HyrelPrinter
 
 ## Example of how to use the generator to gcode files compatible with Hyrel 30M printer.
 def example_hyrel_30m(pattern_name):
-    pattern = Pattern(pattern_name)
-    printer = HyrelPrinter(240, 1200, 0.2, 0.120, 1, 80, 50, [105, 86, 0])
-    printer.slice_pattern(pattern, 4, [0, 10], first_layer_thickness=0.24)
+    printer = HyrelPrinter(240, 1200, 0.2, 0.100, 1, 80, 50, [100, 90, 0])
+    printer.slice_pattern(pattern_name, 4, [0, 10])
     printer.export(f"{pattern_name}_hyrel.gcode")
 
 
 ## Example of how to use the generator to gcode files compatible with Prusa MK4s printer using PLA.
 def example_prusa_mk4s(pattern_name):
-    pattern = Pattern(pattern_name)
     prusa = PrusaPrinter()
     # The header and footer are taken from pre-generated files.
     prusa_header = open("./input/mk4s_PLA_header.txt", "r").read()
     prusa_footer = open("./input/mk4s_PLA_footer.txt", "r").read()
-    prusa.slice_pattern(pattern, 8, [20, 20])
+    prusa.slice_pattern(pattern_name, 8, [20, 20])
 
     prusa.export(f"{pattern_name}_mk4s.gcode", header_supplement=prusa_header, footer_supplement=prusa_footer)
 
