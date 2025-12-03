@@ -187,15 +187,20 @@ class BasePrinter:
 
         self._delete_container_files()
 
-    def slice_pattern(self, pattern: Pattern, layers: int, position: list, **kwargs):
+    def slice_pattern(self, pattern: Pattern | str, layers: int, position: list | np.ndarray, first_layer_height : float=None, **kwargs):
         """
-        Slices the pattern
-        :param pattern:
+        Generates print paths for a given pattern.
+        :param pattern: Pattern object to be sliced or a name of the desired pattern.
         :param layers: Number of layers to generate the output with.
         :param position: Position in mm to which the pattern should be moved. Usually, the pattern extends from [0, 0] in positive direction.
+        :param first_layer_height: If None, prints the first layer thickness at self._first_layer_thickness, which by default is self.layer_thickness
         :param kwargs:
         :return:
         """
+        if isinstance(pattern, str): pattern = Pattern(pattern)
+        elif isinstance(pattern, Pattern): pass
+        else: raise TypeError("Pattern must be either a string or a Pattern object.")
+
         if layers <= 0:
             raise RuntimeError("Pattern cannot be sliced with non-positive number of layers.")
         if not self.__is_initialised:
@@ -214,7 +219,8 @@ class BasePrinter:
         else:
             i_layers = [i % pattern_copy.layer_count for i in range(layers)]
 
-        self._z_move(kwargs.get('first_layer_thickness', self._first_layer_thickness))
+
+        self._z_move(self._first_layer_thickness if first_layer_height is None else first_layer_height)
 
         for i, i_layer in enumerate(i_layers):
             self.slice_layer(pattern_copy.layers[i_layer])
